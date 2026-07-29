@@ -80,7 +80,7 @@ def color_status(val):
 
 st.subheader("Detalle de Proyectos")
 st.dataframe(
-    df.style.applymap(color_status, subset=['Estatus']),
+    df.style.map(color_status, subset=['Estatus']),
     column_config={"Siguiente_paso": st.column_config.TextColumn("Siguiente paso", width="large")},
     use_container_width=True
 )
