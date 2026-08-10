@@ -1,9 +1,16 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import os
 
-# Cargar los datos
+# Cargar los datos de forma robusta
 file_path = 'data/Reunion_interdisciplinaria-HLT_MEZANINE.xlsx'
+
+if not os.path.exists(file_path):
+    st.error(f"El archivo no se encontró en la ruta esperada: {file_path}")
+    st.info("Por favor, asegúrate de que el archivo esté en la carpeta 'data' de tu repositorio.")
+    st.stop()
+
 df = pd.read_excel(file_path)
 
 # Título
