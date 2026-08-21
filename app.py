@@ -1,226 +1,199 @@
-import streamlit as pd
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import datetime
+from datetime import datetime, date
 
-# Configuración de la página
-pd.set_page_config(
-    page_title="Dashboard de Análisis de Visitantes Diario",
+# ----------------------------------------------------
+# 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser el primer comando)
+# ----------------------------------------------------
+st.set_page_config(
+    page_title="Panel de Análisis de Tráfico de Visitantes",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- CARGA Y PREPARACIÓN DE DATOS ---
-@pd.cache_data
-def load_data():
+# ----------------------------------------------------
+# 2. CARGA Y PREPROCESAMIENTO DE DATOS (Con Caché)
+# ----------------------------------------------------
+@st.cache_data
+def cargar_datos():
     """
-    Carga los datos del archivo CSV local si existe, de lo contrario
-    genera un dataset sintético realista basado en el esquema especificado.
+    Intenta cargar datos desde un archivo local. Si falla o no existe,
+    genera un dataset realista basado en el esquema provisto.
     """
     try:
-        # Intento de cargar archivo de datos de producción
-        df = pd.read_csv('visitantes.csv')
-        df['Fecha'] = pd.to_datetime(df['Fecha'])
+        # Intentar cargar desde un archivo JSON local si existe
+        df = pd.read_json("data.json")
+        # Asegurar tipos de columnas según esquema
+        df["Fecha"] = pd.to_datetime(df["Fecha"]).dt.date
+        df["Visitantes"] = df["Visitantes"].astype(int)
     except Exception:
-        # Generación de datos sintéticos (Dummy Data) realistas
+        # Generación de Dummy Data realista en caso de fallo o inexistencia
         np.random.seed(42)
-        base_date = datetime.date(2026, 1, 21)
-        num_days = 120
-        dates = [base_date - datetime.timedelta(days=x) for x in range(num_days)]
-        dates.reverse()  # Orden cronológico
+        rango_fechas = pd.date_range(start="2026-01-01", end="2026-03-31", freq="D")
         
-        # Generación de volumen de visitantes con tendencia y estacionalidad semanal
-        visitors = []
-        for i, date in enumerate(dates):
-            weekday_factor = 1.5 if date.weekday() >= 5 else 1.0  # Más visitas fines de semana
-            trend = i * 0.1  # Ligero crecimiento temporal
-            noise = np.random.randint(-10, 10)
-            val = max(5, int(25 + trend + (weekday_factor * 10) + noise))
-            visitors.append(val)
-            
+        # Simular una tendencia con cierta estacionalidad y ruido
+        visitantes_base = np.random.randint(15, 45, size=len(rango_fechas))
+        # Añadir efecto de fin de semana (más visitas los viernes/sábados)
+        fin_de_semana_efecto = [10 if d.weekday() in [4, 5] else 0 for d in rango_fechas]
+        visitantes_finales = visitantes_base + fin_de_semana_efecto
+        
         df = pd.DataFrame({
-            'Fecha': pd.to_datetime(dates),
-            'Visitantes': visitors
+            "Fecha": rango_fechas.date,
+            "Visitantes": visitantes_finales.astype(int)
         })
+    
     return df
 
-df_raw = load_data()
+# Cargar los datos
+try:
+    df_original = cargar_datos()
+except Exception as e:
+    st.error(f"Error crítico al inicializar la base de datos: {e}")
+    df_original = pd.DataFrame(columns=["Fecha", "Visitantes"])
 
-# --- PANEL DE CONTROL LATERAL (SIDEBAR) ---
-pd.sidebar.header("Panel de Control")
-pd.sidebar.markdown("---")
+# ----------------------------------------------------
+# 3. INTERFAZ DE USUARIO - BARRA LATERAL (FILTROS)
+# ----------------------------------------------------
+st.sidebar.header("Filtros de Datos")
 
-# Rango de fechas dinámico basado en el dataset
-min_date_val = df_raw['Fecha'].min().date()
-max_date_val = df_raw['Fecha'].max().date()
-
-pd.sidebar.subheader("Filtrar por Rango Temporal")
-date_range = pd.sidebar.date_input(
-    "Selecciona las fechas (Desde - Hasta):",
-    value=(min_date_val, max_date_val),
-    min_value=min_date_val,
-    max_value=max_date_val
-)
-
-# Control de granularidad temporal
-pd.sidebar.subheader("Granularidad de Visualización")
-granularity = pd.sidebar.selectbox(
-    "Agrupar datos por:",
-    options=["Día", "Semana"],
-    index=0,
-    help="Permite suavizar las tendencias agrupando las visitas en periodos semanales."
-)
-
-# Validación de selección de rango completo de fechas
-if isinstance(date_range, tuple) and len(date_range) == 2:
-    start_date, end_date = date_range
-else:
-    start_date, end_date = min_date_val, max_date_val
-
-# Filtrado de datos en memoria para optimización de rendimiento
-df_filtered = df_raw[
-    (df_raw['Fecha'].dt.date >= start_date) & 
-    (df_raw['Fecha'].dt.date <= end_date)
-].copy()
-
-# --- TÍTULO Y PROPÓSITO ---
-pd.title("📈 Dashboard de Análisis de Visitantes Diario")
-pd.markdown(
-    """
-    Este dashboard interactivo proporciona una herramienta avanzada para monitorear, 
-    analizar y comprender el comportamiento del flujo de usuarios a lo largo del tiempo. 
-    Permite visualizar la evolución temporal de la variable **Visitantes** según el registro de **Fecha**, 
-    facilitando la toma de decisiones estratégicas basadas en el histórico acumulado.
-    """
-)
-pd.markdown("---")
-
-# --- CÁLCULO DE MÉTRICAS CLAVE (KPIs) ---
-if not df_filtered.empty:
-    # 1. Total Visitantes y cálculo de Periodo Anterior
-    total_visitantes = df_filtered['Visitantes'].sum()
+if not df_original.empty:
+    min_fecha_val = min(df_original["Fecha"])
+    max_fecha_val = max(df_original["Fecha"])
     
-    # Calcular duración del periodo seleccionado para el cálculo de delta
-    duration = pd.to_datetime(end_date) - pd.to_datetime(start_date)
-    prev_end_date = pd.to_datetime(start_date) - pd.Timedelta(days=1)
-    prev_start_date = prev_end_date - duration
+    st.sidebar.subheader("Rango Temporal")
+    rango_seleccionado = st.sidebar.date_input(
+        "Seleccione el período de análisis:",
+        value=(min_fecha_val, max_fecha_val),
+        min_value=min_fecha_val,
+        max_value=max_fecha_val
+    )
     
-    df_prev = df_raw[
-        (df_raw['Fecha'] >= prev_start_date) & 
-        (df_raw['Fecha'] <= prev_end_date)
-    ]
-    total_visitantes_prev = df_prev['Visitantes'].sum()
-    
-    if total_visitantes_prev > 0:
-        pct_change = ((total_visitantes - total_visitantes_prev) / total_visitantes_prev) * 100
-        delta_total = f"{pct_change:+.1f}% vs anterior"
+    # Procesar la selección del rango de fechas de forma segura
+    if isinstance(rango_seleccionado, tuple) and len(rango_seleccionado) == 2:
+        fecha_inicio, fecha_fin = rango_seleccionado
+    elif isinstance(rango_seleccionado, tuple) and len(rango_seleccionado) == 1:
+        fecha_inicio = rango_seleccionado[0]
+        fecha_fin = max_fecha_val
     else:
-        delta_total = "Sin datos previos"
-
-    # 2. Promedio Diario
-    promedio_diario = df_filtered['Visitantes'].mean()
-
-    # 3. Pico Máximo de Tráfico
-    pico_idx = df_filtered['Visitantes'].idxmax()
-    pico_maximo = df_filtered.loc[pico_idx, 'Visitantes']
-    pico_fecha = df_filtered.loc[pico_idx, 'Fecha'].strftime('%Y-%m-%d')
-    delta_pico = f"Registrado el {pico_fecha}"
+        fecha_inicio, fecha_fin = min_fecha_val, max_fecha_val
+        
+    # Filtrado reactivo del dataframe
+    df_filtrado = df_original[
+        (df_original["Fecha"] >= fecha_inicio) & 
+        (df_original["Fecha"] <= fecha_fin)
+    ].copy()
 else:
-    total_visitantes = 0
-    delta_total = "N/A"
-    promedio_diario = 0
-    pico_maximo = 0
-    delta_pico = "N/A"
+    df_filtrado = df_original.copy()
 
-# Render de Métricas en Columnas
-kpi_col1, kpi_col2, kpi_col3 = pd.columns(3)
+# ----------------------------------------------------
+# 4. CUERPO PRINCIPAL: TÍTULO Y PROPÓSITO
+# ----------------------------------------------------
+st.title("📈 Panel de Análisis de Tráfico de Visitantes")
+st.markdown(
+    """
+    Este cuadro de mando interactivo permite monitorear, segmentar y analizar la evolución temporal 
+    de la afluencia de usuarios en la plataforma. Utilice la barra lateral para ajustar el rango de fechas.
+    """
+)
+st.markdown("---")
 
-with kpi_col1:
-    pd.metric(
-        label="Total de Visitantes",
-        value=f"{total_visitantes:,}",
-        delta=delta_total
-    )
-
-with kpi_col2:
-    pd.metric(
-        label="Promedio Diario de Visitantes",
-        value=f"{promedio_diario:.1f}"
-    )
-
-with kpi_col3:
-    pd.metric(
-        label="Pico Máximo de Visitantes",
-        value=f"{pico_maximo:,}",
-        delta=delta_pico,
-        delta_color="off"
-    )
-
-pd.markdown("---")
-
-# --- PROCESAMIENTO SEGÚN GRANULARIDAD ---
-if granularity == "Semana" and not df_filtered.empty:
-    # Agrupación por semana (atribuyendo al lunes de cada semana)
-    df_chart = df_filtered.resample('W-MON', on='Fecha').agg({
-        'Visitantes': 'sum'
-    }).reset_index()
-    x_axis_title = "Semana (Inicio de Lunes)"
-    hover_fmt = "%Y-%m-%d"
+# ----------------------------------------------------
+# 5. CÁLCULO Y RENDERIZADO DE MÉTRICAS CLAVE (KPIs)
+# ----------------------------------------------------
+if not df_filtrado.empty:
+    # 1. Total de Visitantes
+    total_visitantes = int(df_filtrado["Visitantes"].sum())
+    
+    # 2. Promedio Diario de Visitantes
+    promedio_diario = int(round(df_filtrado["Visitantes"].mean()))
+    
+    # 3. Pico Máximo de Visitantes y su Fecha
+    id_max = df_filtrado["Visitantes"].idxmax()
+    pico_maximo = int(df_filtrado.loc[id_max, "Visitantes"])
+    fecha_pico = df_filtrado.loc[id_max, "Fecha"].strftime("%d/%m/%Y")
+    
+    # Visualización en 3 columnas
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric(
+            label="Total de Visitantes",
+            value=f"{total_visitantes:,}".replace(",", ".")
+        )
+        
+    with col2:
+        st.metric(
+            label="Promedio Diario de Visitantes",
+            value=f"{promedio_diario:,}".replace(",", ".")
+        )
+        
+    with col3:
+        st.metric(
+            label="Pico Máximo de Visitantes",
+            value=f"{pico_maximo:,}".replace(",", "."),
+            delta=f"Fecha: {fecha_pico}",
+            delta_color="off"
+        )
 else:
-    df_chart = df_filtered.copy()
-    x_axis_title = "Fecha"
-    hover_fmt = "%Y-%m-%d"
+    st.warning("No hay datos disponibles para el rango de fechas seleccionado.")
 
-# --- VISUALIZACIÓN DE TENDENCIAS ---
-pd.subheader("Evolución Temporal del Flujo de Visitantes")
+st.markdown("---")
 
-if not df_chart.empty:
-    # Generar gráfico interactivo con Plotly Express
-    fig = px.line(
-        df_chart,
-        x='Fecha',
-        y='Visitantes',
-        markers=True,
+# ----------------------------------------------------
+# 6. VISUALIZACIONES
+# ----------------------------------------------------
+if not df_filtrado.empty:
+    # Gráfico de Línea Temporal (Plotly Express para interactividad y tooltips)
+    st.subheader("Evolución Temporal del Tráfico")
+    
+    # Asegurar orden cronológico para el gráfico
+    df_grafico = df_filtrado.sort_values(by="Fecha")
+    
+    fig = px.area(
+        df_grafico,
+        x="Fecha",
+        y="Visitantes",
+        labels={"Fecha": "Fecha de Registro", "Visitantes": "Cantidad de Visitantes"},
         template="plotly_white",
         color_discrete_sequence=["#1f77b4"]
     )
     
-    # Configuración de diseño UX/UI suave (spline) y tooltips customizados
-    fig.update_traces(
-        line_shape='spline', 
-        line=dict(width=3),
-        hovertemplate="<b>Fecha:</b> %{x|<br><b>Visitantes:</b> %{y}<extra></extra>"
-    )
-    
+    # Personalización avanzada del gráfico para UX premium
     fig.update_layout(
         hovermode="x unified",
-        xaxis_title=x_axis_title,
-        yaxis_title="Cantidad de Visitantes",
-        margin=dict(l=40, r=40, t=20, b=40),
-        height=450,
-        xaxis=dict(showgrid=True, gridcolor='rgba(200, 200, 200, 0.2)'),
-        yaxis=dict(showgrid=True, gridcolor='rgba(200, 200, 200, 0.2)')
+        xaxis=dict(showgrid=True, gridcolor='LightGrey'),
+        yaxis=dict(showgrid=True, gridcolor='LightGrey'),
+        margin=dict(l=40, r=40, t=20, b=40)
     )
     
-    pd.plotly_chart(fig, use_container_width=True)
-else:
-    pd.warning("No hay datos disponibles para el rango de fechas seleccionado.")
-
-# --- TABLA DE DATOS HISTÓRICOS (EXPANDER) ---
-with pd.expander("Ver Datos Históricos Detallados"):
-    if not df_filtered.empty:
-        # Formatear la fecha para una visualización más amigable
-        df_display = df_filtered.copy()
-        df_display['Fecha'] = df_display['Fecha'].dt.strftime('%Y-%m-%d')
-        pd.dataframe(
-            df_display.sort_values(by="Fecha", ascending=False),
-            use_container_width=True,
+    fig.update_traces(
+        hovertemplate="<b>Fecha:</b> %{x}<br><b>Visitantes:</b> %{y}<extra></extra>",
+        line=dict(width=2),
+        fillcolor="rgba(31, 119, 180, 0.2)"
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
+    
+    # Tabla de Datos Detallada (Desplegable)
+    with st.expander("Ver Datos Históricos Detallados"):
+        st.markdown("A continuación se detallan los registros correspondientes al período seleccionado, ordenados de forma cronológica descendente.")
+        
+        # Ordenación cronológica descendente según instrucciones de UX
+        df_tabla = df_filtrado.sort_values(by="Fecha", ascending=False)
+        
+        # Formatear la visualización de la tabla
+        st.dataframe(
+            df_tabla,
             column_config={
-                "Fecha": pd.column_config.DateColumn("Fecha de Registro"),
-                "Visitantes": pd.column_config.NumberColumn("Total de Visitantes", format="%d")
+                "Fecha": st.column_config.DateColumn("Fecha", format="DD/MM/YYYY"),
+                "Visitantes": st.column_config.NumberColumn("Visitantes", format="%d")
             },
-            hide_index=True
+            hide_index=True,
+            use_container_width=True
         )
-    else:
-        pd.info("No hay registros en el rango seleccionado.")
+
+st.caption("DEPLOY_ID: DEPLOY_1787288618")
