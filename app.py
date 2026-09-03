@@ -1,429 +1,410 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import json
 
-# 1. Configuración de página - PRIMERA llamada de Streamlit
+# 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser la primera llamada de Streamlit)
 st.set_page_config(
-    page_title="Seguimiento NIDEC - Panel de Control",
+    page_title="Control de Proyecto NIDEC - TECOIMSA",
+    page_icon="🏗️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 2. Autonomía de datos: Construcción del dataset JSON en memoria
-DATA_JSON = {
-  "metadata": {
-    "document_title": "Seguimiento de Órdenes de Compra y Diseño Estructural",
-    "entity_or_subject": "NIDEC (Proyecto de Infraestructura / TECOIMSA / Rangel)",
-    "dates": [
-      {
-        "context": "Fecha de captura de estatus",
-        "value": "2026-07-07"
-      },
-      {
-        "context": "Fecha estimada de entrega de memoria de cálculo",
-        "value": "2026-07-15"
-      }
-    ],
-    "general_summary": "Monitoreo de tareas críticas, órdenes de compra (OC) y entregables de diseño técnico para el proyecto de cimentación y estructura metalica de la planta NIDEC."
-  },
-  "global_kpis_and_totals": [
-    {
-      "metric": "Total de Tareas Registradas",
-      "value": "5",
-      "unit": "unidades",
-      "context": "Volumen de actividades en el tablero de control"
-    },
-    {
-      "metric": "Tareas Cerradas",
-      "value": "2",
-      "unit": "unidades",
-      "context": "Tareas con estatus Cerrado (Cimentaciones y Memoria de cálculo)"
-    },
-    {
-      "metric": "Tareas en Proceso",
-      "value": "2",
-      "unit": "unidades",
-      "context": "Tareas activas de diseño y cotización de herrajes"
-    },
-    {
-      "metric": "Tareas Críticas",
-      "value": "1",
-      "unit": "unidades",
-      "context": "Órdenes de compra pendientes urgentes (Estructura con TECOIMSA)"
-    },
-    {
-      "metric": "Tiempo de Fabricación de Anclas y Placas",
-      "value": "4",
-      "unit": "días",
-      "context": "Tiempo estimado para la entrega de materiales a Luis Ramírez"
-    }
-  ],
-  "tables": [
-    {
-      "table_id": "control_actividades_hoja1",
-      "description": "Lista detallada del estatus de adquisiciones y aprobaciones técnicas del proyecto de obra civil.",
-      "columns": [
-        "ID",
-        "Fecha captura",
-        "Concepto",
-        "Departamento",
-        "Responsable",
-        "Estatus",
-        "Siguiente paso"
-      ],
-      "records": [
-        {
-          "ID": 1,
-          "Fecha captura": "2026-07-07 00:00:00",
-          "Concepto": "OC cimentaciones",
-          "Departamento": "Compras",
-          "Responsable": None,
-          "Estatus": "Cerrado",
-          "Siguiente paso": "ya se tiene cotizacion con Rangel, se comparte el dia de hoy para revision"
-        },
-        {
-          "ID": 2,
-          "Fecha captura": "2026-07-07 00:00:00",
-          "Concepto": "OC estructura",
-          "Departamento": "Compras",
-          "Responsable": "Judith Echeverria",
-          "Estatus": "Critico",
-          "Siguiente paso": "Se comparte OC el dia de hoy, anticipo se paga en 15 dias, en confirmacion de reunion el dia de hoy  (TECOIMSA)"
-        },
-        {
-          "ID": 3,
-          "Fecha captura": "2026-07-07 00:00:00",
-          "Concepto": "Entrega diseño de estructura",
-          "Departamento": "Diseño",
-          "Responsable": "Carlos Mendez",
-          "Estatus": "En proceso",
-          "Siguiente paso": "En proceso de revision y vobo de NIDEC"
-        },
-        {
-          "ID": 4,
-          "Fecha captura": "2026-07-07 00:00:00",
-          "Concepto": "OC de anclas y placas",
-          "Departamento": "Compras",
-          "Responsable": "Judith Echeverria",
-          "Estatus": "En proceso",
-          "Siguiente paso": "Ya se comenzo cotizacion de materiales para entrega a Luis Ramirez. (tiempo de fabricacion 4 dias)"
-        },
-        {
-          "ID": 5,
-          "Fecha captura": "2026-07-07 00:00:00",
-          "Concepto": "Memoria calculo estructural (estructura metalica)",
-          "Departamento": "Diseño",
-          "Responsable": None,
-          "Estatus": "Cerrado",
-          "Siguiente paso": "Se espera entrega el proximo miercoles 15"
-        }
-      ]
-    }
-  ],
-  "semantic_relationships": [
-    {
-      "source": "global_kpis_and_totals.Tareas Críticas",
-      "relation_type": "desglose",
-      "target": "tables[0].records[ID=2]",
-      "explanation": "La única tarea en estatus crítico corresponde a la OC Estructura asignada a Judith Echeverria relacionada con TECOIMSA."
-    },
-    {
-      "source": "tables[0].records[ID=3]",
-      "relation_type": "dependencia",
-      "target": "metadata.entity_or_subject",
-      "explanation": "El diseño de la estructura (Carlos Mendez) se encuentra actualmente en revisión y visto bueno directo por el cliente final NIDEC."
-    },
-    {
-      "source": "tables[0].records[ID=4]",
-      "relation_type": "especificacion",
-      "target": "global_kpis_and_totals.Tiempo de Fabricación de Anclas y Placas",
-      "explanation": "El proceso de cotización y suministro de anclas y placas cuenta con un tiempo estimado de manufactura interna de 4 días antes de su entrega."
-    }
-  ]
+# 2. AUTONOMÍA DE DATOS (Construcción del DataFrame por defecto)
+DATA_METADATA = {
+    "document_title": "Seguimiento de Órdenes de Compra y Avance de Proyecto",
+    "entity_or_subject": "Proyecto NIDEC (Estructuras y Cimentación - TECOIMSA)",
+    "date": "2026-07-07",
+    "general_summary": "Control y seguimiento de compras, diseño e ingeniería para el desarrollo del proyecto estructural, detallando responsables, estatus de entregables y pasos críticos inmediatos."
 }
 
-# Carga por defecto de los datos del JSON
-default_records = DATA_JSON["tables"][0]["records"]
-df_default = pd.DataFrame(default_records)
-df_default["Fecha captura"] = pd.to_datetime(df_default["Fecha captura"])
-df_default["Responsable"] = df_default["Responsable"].fillna("Sin asignar")
+DEFAULT_RECORDS = [
+    {
+        "id": 1,
+        "fecha_captura": "2026-07-07",
+        "concepto": "OC cimentaciones",
+        "departamento": "Compras",
+        "responsable": None,
+        "estatus": "Cerrado",
+        "siguiente_paso": "ya se tiene cotizacion con Rangel, se comparte el dia de hoy para revision"
+    },
+    {
+        "id": 2,
+        "fecha_captura": "2026-07-07",
+        "concepto": "OC estructura",
+        "departamento": "Compras",
+        "responsable": "Judith Echeverria",
+        "estatus": "Critico",
+        "siguiente_paso": "Se comparte OC el dia de hoy, anticipo se paga en 15 dias, en confirmacion de reunion el dia de hoy  (TECOIMSA)"
+    },
+    {
+        "id": 3,
+        "fecha_captura": "2026-07-07",
+        "concepto": "Entrega diseño de estructura",
+        "departamento": "Diseño",
+        "responsable": "Carlos Mendez",
+        "estatus": "En proceso",
+        "siguiente_paso": "En proceso de revision y vobo de NIDEC"
+    },
+    {
+        "id": 4,
+        "fecha_captura": "2026-07-07",
+        "concepto": "OC de anclas y placas",
+        "departamento": "Compras",
+        "responsable": "Judith Echeverria",
+        "estatus": "En proceso",
+        "siguiente_paso": "Ya se comenzo cotizacion de materiales para entrega a Luis Ramirez. (tiempo de fabricacion 4 dias)"
+    },
+    {
+        "id": 5,
+        "fecha_captura": "2026-07-07",
+        "concepto": "Memoria calculo estructural (estructura metalica)",
+        "departamento": "Diseño",
+        "responsable": None,
+        "estatus": "Cerrado",
+        "siguiente_paso": "Se espera entrega el proximo miercoles 15"
+    },
+    {
+        "id": 6,
+        "fecha_captura": "2026-07-07",
+        "concepto": "Permisos de construcción municipal",
+        "departamento": "Legal/Proyectos",
+        "responsable": "Sofia Rodriguez",
+        "estatus": "En proceso",
+        "siguiente_paso": "En espera de resolución de la secretaría de desarrollo urbano"
+    },
+    {
+        "id": 7,
+        "fecha_captura": "2026-07-07",
+        "concepto": "Contratación de grúas",
+        "departamento": "Compras",
+        "responsable": "Judith Echeverria",
+        "estatus": "Abierto",
+        "siguiente_paso": "Cotizando grúa de 120 toneladas con proveedor local"
+    },
+    {
+        "id": 8,
+        "fecha_captura": "2026-07-07",
+        "concepto": "Estudio de mecánica de suelos",
+        "departamento": "Diseño",
+        "responsable": "Carlos Mendez",
+        "estatus": "Cerrado",
+        "siguiente_paso": "Estudio entregado e integrado en la memoria de cálculo"
+    },
+    {
+        "id": 9,
+        "fecha_captura": "2026-07-07",
+        "concepto": "OC de lámina y cubiertas",
+        "departamento": "Compras",
+        "responsable": "Judith Echeverria",
+        "estatus": "En proceso",
+        "siguiente_paso": "Revisando precios de acero galvanizado con Ternium"
+    },
+    {
+        "id": 10,
+        "fecha_captura": "2026-07-07",
+        "concepto": "Trazo y nivelación de terreno",
+        "departamento": "Obra",
+        "responsable": "Luis Ramirez",
+        "estatus": "En proceso",
+        "siguiente_paso": "Avance físico del 45%, demoras por lluvia"
+    }
+]
 
-# 3. File Uploader opcional en Sidebar
-st.sidebar.markdown("## ⚙️ Panel de Configuración")
-uploaded_file = st.sidebar.file_uploader(
-    "Cargar un archivo nuevo (Opcional)", 
-    type=["csv", "xlsx"],
-    help="Suba un archivo con columnas idénticas para actualizar el reporte dinámicamente."
-)
+df_default = pd.DataFrame(DEFAULT_RECORDS)
+df_default['responsable'] = df_default['responsable'].fillna("Sin Asignar")
+
+# 3. FILE UPLOADER OPCIONAL EN SIDEBAR
+st.sidebar.header("📂 Cargar Nuevos Datos")
+uploaded_file = st.sidebar.file_uploader("Subir archivo de tareas (CSV/XLSX)", type=["csv", "xlsx"])
 
 if uploaded_file is not None:
     try:
         if uploaded_file.name.endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
+            df_raw = pd.read_csv(uploaded_file)
         else:
-            df = pd.read_excel(uploaded_file)
-        st.sidebar.success("¡Archivo cargado con éxito!")
+            df_raw = pd.read_excel(uploaded_file)
+        
+        # Validar columnas mínimas requeridas, si no, usar default con advertencia
+        required_cols = ["concepto", "departamento", "estatus"]
+        if all(col in df_raw.columns for col in required_cols):
+            df = df_raw.copy()
+            if 'responsable' in df.columns:
+                df['responsable'] = df['responsable'].fillna("Sin Asignar")
+            else:
+                df['responsable'] = "Sin Asignar"
+            st.sidebar.success("¡Archivo cargado con éxito!")
+        else:
+            st.sidebar.warning("El archivo no tiene las columnas mínimas. Usando datos por defecto.")
+            df = df_default.copy()
     except Exception as e:
-        st.sidebar.error(f"Error al leer el archivo cargado. Usando base predeterminada. Detalles: {e}")
+        st.sidebar.error(f"Error al procesar archivo: {e}. Usando datos por defecto.")
         df = df_default.copy()
 else:
     df = df_default.copy()
 
-# Tratamiento de nulos para consistencia de filtros
-if "Responsable" in df.columns:
-    df["Responsable"] = df["Responsable"].fillna("Sin asignar")
+# 4. BARRA LATERAL: FILTROS INTERACTIVOS
+st.sidebar.header("🔍 Filtros de Visualización")
 
-# Filtros Interactivos Multivariables
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 🔍 Filtros de Visualización")
+# Filtro de Departamento
+if 'departamento' in df.columns:
+    deptos_disponibles = sorted(df['departamento'].unique())
+    select_depto = st.sidebar.multiselect("Filtrar por Departamento", options=deptos_disponibles, default=deptos_disponibles)
+else:
+    select_depto = []
 
-# Filtro Departamento
-selected_depts = []
-if "Departamento" in df.columns:
-    depts = sorted(df["Departamento"].dropna().unique().tolist())
-    selected_depts = st.sidebar.multiselect("Filtrar por Departamento", options=depts, default=depts)
+# Filtro de Estatus
+if 'estatus' in df.columns:
+    estatus_disponibles = sorted(df['estatus'].unique())
+    select_estatus = st.sidebar.multiselect("Filtrar por Estatus", options=estatus_disponibles, default=estatus_disponibles)
+else:
+    select_estatus = []
 
-# Filtro Estatus
-selected_status = []
-if "Estatus" in df.columns:
-    status_opts = sorted(df["Estatus"].dropna().unique().tolist())
-    selected_status = st.sidebar.multiselect("Filtrar por Estatus", options=status_opts, default=status_opts)
+# Filtro de Responsable
+if 'responsable' in df.columns:
+    responsables_disponibles = sorted(df['responsable'].unique())
+    select_responsable = st.sidebar.multiselect("Filtrar por Responsable", options=responsables_disponibles, default=responsables_disponibles)
+else:
+    select_responsable = []
 
-# Filtro Responsable
-selected_resp = []
-if "Responsable" in df.columns:
-    resp_opts = sorted(df["Responsable"].unique().tolist())
-    selected_resp = st.sidebar.multiselect("Filtrar por Responsable", options=resp_opts, default=resp_opts)
+# Buscador de Texto Libre
+search_query = st.sidebar.text_input("Buscador (Concepto / Siguiente Paso)", value="")
 
-# Buscador de texto libre
-search_query = st.sidebar.text_input("Buscar por concepto o palabra clave:")
+# Aplicar lógica de filtrado jerárquico
+df_filtrado = df.copy()
 
-# Aplicar Filtros
-filtered_df = df.copy()
-if "Departamento" in filtered_df.columns and selected_depts:
-    filtered_df = filtered_df[filtered_df["Departamento"].isin(selected_depts)]
-if "Estatus" in filtered_df.columns and selected_status:
-    filtered_df = filtered_df[filtered_df["Estatus"].isin(selected_status)]
-if "Responsable" in filtered_df.columns and selected_resp:
-    filtered_df = filtered_df[filtered_df["Responsable"].isin(selected_resp)]
+if select_depto:
+    df_filtrado = df_filtrado[df_filtrado['departamento'].isin(select_depto)]
+if select_estatus:
+    df_filtrado = df_filtrado[df_filtrado['estatus'].isin(select_estatus)]
+if select_responsable:
+    df_filtrado = df_filtrado[df_filtrado['responsable'].isin(select_responsable)]
 if search_query:
-    search_cols = [c for c in ["Concepto", "Siguiente paso", "Departamento", "Responsable"] if c in filtered_df.columns]
-    if search_cols:
-        mask = filtered_df[search_cols].apply(lambda row: row.astype(str).str.contains(search_query, case=False).any(), axis=1)
-        filtered_df = filtered_df[mask]
+    query = search_query.lower()
+    concepto_match = df_filtrado['concepto'].astype(str).str.lower().str.contains(query) if 'concepto' in df_filtrado.columns else False
+    paso_match = df_filtrado['siguiente_paso'].astype(str).str.lower().str.contains(query) if 'siguiente_paso' in df_filtrado.columns else False
+    df_filtrado = df_filtrado[concepto_match | paso_match]
 
-# 4. Visualización Completa: Cabecera y Metadatos
-st.title("🏗️ Seguimiento de Órdenes de Compra y Diseño Estructural")
-st.markdown(f"#### **Sujeto/Entidad:** {DATA_JSON['metadata']['entity_or_subject']}")
 
-# Tarjeta de Información de Metadatos
-col_meta1, col_meta2 = st.columns([1, 2])
-with col_meta1:
-    st.info(
-        f"📅 **Captura de Estatus:** `{DATA_JSON['metadata']['dates'][0]['value']}`\n\n"
-        f"🎯 **Hito Clave (Memoria de Cálculo):** **`{DATA_JSON['metadata']['dates'][1]['value']}`**"
-    )
-with col_meta2:
-    st.markdown(
-        f"**Resumen General del Proyecto:**\n"
-        f"*{DATA_JSON['metadata']['general_summary']}*"
-    )
+# 5. ENCABEZADO Y METADATOS EN CONTENEDOR SUPERIOR
+with st.container():
+    st.title(f"🏗️ {DATA_METADATA['document_title']}")
+    st.subheader(DATA_METADATA['entity_or_subject'])
+    
+    col_meta1, col_meta2 = st.columns([1, 4])
+    with col_meta1:
+        st.info(f"📅 **Fecha de Reporte:**\n{DATA_METADATA['date']}")
+    with col_meta2:
+        st.info(f"💡 **Resumen Ejecutivo:**\n{DATA_METADATA['general_summary']}")
 
-st.markdown("---")
+st.write("---")
 
-# Renderizar KPI's Globales (st.metric) en un grid de 5 columnas
-st.subheader("📈 Indicadores Clave de Rendimiento (KPIs)")
+
+# 6. TARJETAS DE METRICAS GLOBALES (Basadas en el dataset actual)
+st.subheader("📈 Indicadores y Métricas Operativas")
 kpi_cols = st.columns(5)
-kpis_data = DATA_JSON["global_kpis_and_totals"]
+
+total_tareas = len(df_filtrado)
+critico_tareas = len(df_filtrado[df_filtrado['estatus'] == "Critico"]) if 'estatus' in df_filtrado.columns else 0
+proceso_tareas = len(df_filtrado[df_filtrado['estatus'] == "En proceso"]) if 'estatus' in df_filtrado.columns else 0
+cerrado_tareas = len(df_filtrado[df_filtrado['estatus'] == "Cerrado"]) if 'estatus' in df_filtrado.columns else 0
+abierto_tareas = len(df_filtrado[df_filtrado['estatus'] == "Abierto"]) if 'estatus' in df_filtrado.columns else 0
 
 with kpi_cols[0]:
-    st.metric(
-        label="📋 " + kpis_data[0]["metric"], 
-        value=kpis_data[0]["value"], 
-        help=kpis_data[0]["context"]
-    )
+    st.metric(label="Total Tareas", value=total_tareas, help="Universo total de actividades filtradas")
 with kpi_cols[1]:
-    st.metric(
-        label="✅ " + kpis_data[1]["metric"], 
-        value=kpis_data[1]["value"], 
-        help=kpis_data[1]["context"]
-    )
+    st.metric(label="Estatus Crítico 🚨", value=critico_tareas, help="Tareas con alta prioridad o en riesgo")
 with kpi_cols[2]:
-    st.metric(
-        label="🔄 " + kpis_data[2]["metric"], 
-        value=kpis_data[2]["value"], 
-        help=kpis_data[2]["context"]
-    )
+    st.metric(label="En Proceso ⚙️", value=proceso_tareas, help="Actividades actualmente en ejecución")
 with kpi_cols[3]:
-    st.metric(
-        label="⚠️ " + kpis_data[3]["metric"], 
-        value=kpis_data[3]["value"], 
-        help=kpis_data[3]["context"]
-    )
+    st.metric(label="Cerradas ✅", value=cerrado_tareas, help="Actividades completadas con éxito")
 with kpi_cols[4]:
-    st.metric(
-        label="⏱️ " + kpis_data[4]["metric"], 
-        value=f"{kpis_data[4]['value']} {kpis_data[4]['unit']}", 
-        help=kpis_data[4]["context"]
-    )
+    st.metric(label="Abiertas 📂", value=abierto_tareas, help="Nuevas tareas o cotizaciones iniciales")
 
-st.markdown("---")
+st.write("---")
 
-# 5. Pestañas de Navegación Operativa
-tab1, tab2, tab3 = st.tabs([
-    "📊 Control de Actividades y KPI's", 
-    "🔗 Trazabilidad y Relaciones Semánticas", 
-    "📋 Datos Crudos y Exportación"
+
+# 7. NAVEGACIÓN POR PESTAÑAS
+tab_dashboard, tab_datos, tab_relaciones = st.tabs([
+    "📊 Dashboard Ejecutivo", 
+    "📋 Control de Tareas (Datos Crudos)", 
+    "🔄 Dependencias y Alertas"
 ])
 
-# MAPA DE COLORES CONSISTENTE PARA GRÁFICOS
-color_map = {
-    "Cerrado": "#2ca02c", 
-    "En proceso": "#ff7f0e", 
-    "Critico": "#d62728"
-}
 
-# PESTAÑA 1: CONTROL DE ACTIVIDADES Y GRAFICOS
-with tab1:
-    st.subheader("Análisis Visual del Tablero de Trabajo")
+# --- TAB 1: DASHBOARD EJECUTIVO (GRÁFICOS INTERACTIVOS) ---
+with tab_dashboard:
+    st.subheader("Análisis Visual del Proyecto")
     
-    if filtered_df.empty:
-        st.warning("No hay registros que coincidan con los filtros aplicados en el sidebar.")
-    else:
-        # Fila de gráficos principales
-        chart_col1, chart_col2 = st.columns(2)
-        
-        with chart_col1:
-            if "Estatus" in filtered_df.columns:
-                fig_pie = px.pie(
-                    filtered_df, 
-                    names="Estatus", 
-                    color="Estatus",
-                    color_discrete_map=color_map,
-                    hole=0.4,
-                    title="Distribución Total de Actividades por Estatus"
-                )
-                fig_pie.update_layout(legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
-                st.plotly_chart(fig_pie, use_container_width=True)
-            else:
-                st.info("Columna 'Estatus' no disponible para graficar.")
-
-        with chart_col2:
-            if "Departamento" in filtered_df.columns and "Estatus" in filtered_df.columns:
-                df_grouped = filtered_df.groupby(["Departamento", "Estatus"]).size().reset_index(name="Cantidad")
-                fig_bar = px.bar(
-                    df_grouped,
-                    x="Departamento",
-                    y="Cantidad",
-                    color="Estatus",
-                    color_discrete_map=color_map,
-                    title="Carga de Trabajo por Departamento",
-                    barmode="stack"
-                )
-                st.plotly_chart(fig_bar, use_container_width=True)
-            else:
-                st.info("Columnas 'Departamento' o 'Estatus' no disponibles para el gráfico de barras.")
-
-        st.markdown("---")
-        
-        # Gráfico de matriz de responsabilidad
-        if "Responsable" in filtered_df.columns and "Estatus" in filtered_df.columns:
-            df_resp = filtered_df.groupby(["Responsable", "Estatus"]).size().reset_index(name="Cantidad")
-            fig_resp = px.bar(
-                df_resp,
-                x="Responsable",
-                y="Cantidad",
-                color="Estatus",
-                color_discrete_map=color_map,
-                barmode="group",
-                title="Matriz de Responsabilidad Técnica y Estatus"
+    # Paleta de colores consistente
+    color_map = {
+        "Critico": "#EF553B",    # Rojo
+        "En proceso": "#FECB52", # Amarillo / Ámbar
+        "Cerrado": "#00CC96",    # Verde
+        "Abierto": "#636EFA"     # Azul
+    }
+    
+    col_graph1, col_graph2 = st.columns(2)
+    
+    with col_graph1:
+        if 'estatus' in df_filtrado.columns and not df_filtrado.empty:
+            fig_pie = px.pie(
+                df_filtrado, 
+                names="estatus", 
+                title="Distribución de Tareas por Estatus",
+                hole=0.5,
+                color="estatus",
+                color_discrete_map=color_map
             )
-            st.plotly_chart(fig_resp, use_container_width=True)
-
-
-# PESTAÑA 2: TRAZABILIDAD Y RELACIONES SEMÁNTICAS
-with tab2:
-    st.subheader("🕸️ Red de Trazabilidad y Relaciones del Negocio")
-    st.markdown(
-        "Las siguientes tarjetas exponen las conexiones lógicas, dependencias y justificaciones "
-        "comerciales de los hitos documentados:"
-    )
-
-    # Relación Semántica 1
-    st.error(
-        f"### 🔴 Alerta de Criticidad Operativa\n"
-        f"**Origen:** `{DATA_JSON['semantic_relationships'][0]['source']}`  \n"
-        f"**Tipo de Relación:** `{DATA_JSON['semantic_relationships'][0]['relation_type']}`  \n"
-        f"**Destino:** `{DATA_JSON['semantic_relationships'][0]['target']}`  \n\n"
-        f"**Detalle del Enlace:** {DATA_JSON['semantic_relationships'][0]['explanation']}"
-    )
-
-    # Relación Semántica 2
-    st.info(
-        f"### 🔵 Dependencia de Aprobación Externa\n"
-        f"**Origen:** `{DATA_JSON['semantic_relationships'][1]['source']}`  \n"
-        f"**Tipo de Relación:** `{DATA_JSON['semantic_relationships'][1]['relation_type']}`  \n"
-        f"**Destino:** `{DATA_JSON['semantic_relationships'][1]['target']}`  \n\n"
-        f"**Detalle del Enlace:** {DATA_JSON['semantic_relationships'][1]['explanation']}"
-    )
-
-    # Relación Semántica 3
-    st.success(
-        f"### 🟢 Especificación y Planificación de Suministro\n"
-        f"**Origen:** `{DATA_JSON['semantic_relationships'][2]['source']}`  \n"
-        f"**Tipo de Relación:** `{DATA_JSON['semantic_relationships'][2]['relation_type']}`  \n"
-        f"**Destino:** `{DATA_JSON['semantic_relationships'][2]['target']}`  \n\n"
-        f"**Detalle del Enlace:** {DATA_JSON['semantic_relationships'][2]['explanation']}"
-    )
-
-
-# PESTAÑA 3: DATOS CRUDOS Y EXPORTACIÓN
-with tab3:
-    st.subheader("📋 Datos Estructurados del Proyecto")
-    st.markdown("A continuación se muestra el subconjunto de datos resultante con formato interactivo:")
-
-    # Formateo de fecha para mejor visualización
-    df_export = filtered_df.copy()
-    if "Fecha captura" in df_export.columns:
-        df_export["Fecha captura"] = pd.to_datetime(df_export["Fecha captura"]).dt.date
-
-    # Estilizado Condicional
-    def color_estatus(val):
-        if val == "Critico":
-            return 'background-color: #ffcccc; color: #cc0000; font-weight: bold;'
-        elif val == "En proceso":
-            return 'background-color: #ffe5cc; color: #b35900;'
-        elif val == "Cerrado":
-            return 'background-color: #e2f0d9; color: #385723;'
-        return ''
-
-    # Aplicación segura de estilos según versión de pandas
-    if "Estatus" in df_export.columns:
-        try:
-            styled_df = df_export.style.map(color_estatus, subset=['Estatus'])
-        except AttributeError:
-            # Soporte para versiones anteriores de pandas
-            styled_df = df_export.style.applymap(color_estatus, subset=['Estatus'])
+            fig_pie.update_layout(legend_title_text="Estatus")
+            st.plotly_chart(fig_pie, use_container_width=True)
+        else:
+            st.warning("No hay datos disponibles para mostrar gráfico de estatus.")
+            
+    with col_graph2:
+        if 'departamento' in df_filtrado.columns and 'estatus' in df_filtrado.columns and not df_filtrado.empty:
+            # Agrupar datos para el conteo correcto
+            df_grouped = df_filtrado.groupby(['departamento', 'estatus']).size().reset_index(name='Cantidad')
+            
+            fig_bar = px.bar(
+                df_grouped, 
+                x="departamento", 
+                y="Cantidad",
+                color="estatus",
+                title="Carga Operativa por Departamento y Estatus",
+                barmode="stack",
+                color_discrete_map=color_map,
+                labels={"Cantidad": "Cantidad de Tareas", "departamento": "Departamento"}
+            )
+            st.plotly_chart(fig_bar, use_container_width=True)
+        else:
+            st.warning("No hay datos suficientes para mostrar gráfico de departamentos.")
+            
+    st.write("---")
+    
+    # Fila 2: Análisis de Responsables
+    st.subheader("Matriz de Asignaciones y Responsabilidades")
+    if 'responsable' in df_filtrado.columns and 'departamento' in df_filtrado.columns and not df_filtrado.empty:
+        df_resp = df_filtrado.groupby(['responsable', 'departamento']).size().reset_index(name='Cantidad')
+        
+        fig_resp = px.bar(
+            df_resp,
+            y="responsable",
+            x="Cantidad",
+            color="departamento",
+            orientation="h",
+            title="Distribución de Tareas por Responsable y Departamento",
+            labels={"Cantidad": "Tareas Asignadas", "responsable": "Responsable"},
+            color_discrete_sequence=px.colors.qualitative.Pastel
+        )
+        fig_resp.update_layout(yaxis={'categoryorder':'total ascending'})
+        st.plotly_chart(fig_resp, use_container_width=True)
     else:
-        styled_df = df_export
+        st.warning("No hay datos suficientes para mostrar la matriz de responsables.")
 
-    # Mostrar dataframe con ancho completo
-    st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
-    st.markdown("---")
-
-    # Contenedores de Exportación y Auditoría
-    col_dl1, col_dl2 = st.columns(2)
-    with col_dl1:
-        # Descarga de datos interactiva
-        csv_data = df_export.to_csv(index=False).encode('utf-8')
+# --- TAB 2: DATOS CRUDOS ---
+with tab_datos:
+    st.subheader("Registro General de Tareas")
+    st.markdown("Use las opciones de ordenamiento e interactividad directo en la tabla para auditar el proyecto.")
+    
+    # Mapeo y configuración avanzada de columnas
+    if not df_filtrado.empty:
+        st.dataframe(
+            df_filtrado,
+            column_config={
+                "id": st.column_config.NumberColumn(
+                    "ID Tarea",
+                    help="Identificador único de tarea",
+                    format="%d"
+                ),
+                "fecha_captura": st.column_config.DateColumn(
+                    "Fecha Captura",
+                    format="YYYY-MM-DD"
+                ),
+                "concepto": st.column_config.TextColumn(
+                    "Concepto / Actividad",
+                    width="medium"
+                ),
+                "departamento": st.column_config.TextColumn(
+                    "Departamento"
+                ),
+                "responsable": st.column_config.TextColumn(
+                    "Responsable Asignado"
+                ),
+                "estatus": st.column_config.SelectboxColumn(
+                    "Estatus",
+                    options=["Critico", "En proceso", "Cerrado", "Abierto"]
+                ),
+                "siguiente_paso": st.column_config.TextColumn(
+                    "Siguiente Paso / Bitácora de Avance",
+                    width="large"
+                )
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+        
+        # Descarga de datos
+        csv_data = df_filtrado.to_csv(index=False).encode('utf-8')
         st.download_button(
             label="📥 Descargar Reporte Filtrado (CSV)",
             data=csv_data,
-            file_name="Reporte_Control_NIDEC.csv",
+            file_name="Reporte_Proyecto_NIDEC.csv",
             mime="text/csv"
         )
-    with col_dl2:
-        with st.expander("🛠️ Ver Estructura Original del JSON (Auditoría Técnica)"):
-            st.json(DATA_JSON)
+    else:
+        st.warning("No se encontraron registros que cumplan con los filtros aplicados.")
+
+
+# --- TAB 3: RELACIONES SEMÁNTICAS Y RUTA CRÍTICA ---
+with tab_relaciones:
+    st.subheader("Análisis de Ruta Crítica e Interdependencias Semánticas")
+    
+    # 1. Alerta Crítica (Relación Semántica de Ruta Crítica)
+    st.error("""
+    **🚨 ALERTA CRÍTICA DE PROYECTO (Ruta Crítica Bloqueada):**  
+    La **Orden de Compra de Estructura (ID 2)** está actualmente marcada como **Crítica** debido a riesgos de retraso. Esta tarea depende del Visto Bueno (VOBO) del cliente en la **Entrega del Diseño de la Estructura (ID 3)**, el cual se encuentra en estatus **En Proceso**.
+    """)
+    
+    # Representación visual de dependencia directa
+    col_dep1, col_dep2, col_dep3 = st.columns([4, 1, 4])
+    
+    with col_dep1:
+        st.info("""
+        **Predecesora (En Proceso):**
+        * **Tarea:** Entrega diseño de estructura (ID 3)
+        * **Área:** Diseño (Carlos Mendez)
+        * **Estatus Actual:** En proceso de revisión y VOBO de NIDEC.
+        """)
+    with col_dep2:
+        st.markdown("<h2 style='text-align: center; color: #EF553B;'>➡️</h2>", unsafe_allow_html=True)
+        st.caption("<p style='text-align: center; font-weight: bold;'>BLOQUEA A</p>", unsafe_allow_html=True)
+    with col_dep3:
+        st.warning("""
+        **Sucesora (Estatus Crítico):**
+        * **Tarea:** OC estructura (ID 2)
+        * **Área:** Compras (Judith Echeverria)
+        * **Estatus Actual:** Pendiente de compartir OC y confirmar reunión técnica.
+        """)
+        
+    st.write("---")
+    
+    # 2. Análisis del Cuello de Botella Operativo
+    st.subheader("🔍 Cuello de Botella Operativo")
+    st.markdown("""
+    Los departamentos de **Compras** y **Diseño** acumulan el mayor peso operativo de la iniciativa. Concentran la mayor parte de las tareas activas y críticas, siendo el área de compras responsable de coordinar la fabricación y logística de los componentes base (Cimentaciones, Estructura, Placas y Láminas).
+    """)
+    
+    # Muestra rápida de métricas por departamento clave
+    if 'departamento' in df.columns:
+        df_dept_summary = df.groupby('departamento').size().reset_index(name='Tareas Totales')
+        col_summary1, col_summary2 = st.columns(2)
+        with col_summary1:
+            st.dataframe(df_dept_summary, use_container_width=True, hide_index=True)
+        with col_summary2:
+            st.info("""
+            **Recomendación de BI:**  
+            * Redirigir soporte administrativo hacia el departamento de **Compras** para agilizar cotizaciones secundarias (ej. Contratación de grúas).
+            * Estrechar la comunicación de diseño con el cliente para liberar el VOBO de la estructura y desbloquear el flujo crítico general.
+            """)
