@@ -1,362 +1,364 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import matplotlib  # Importado para asegurar compatibilidad con posibles renderizados internos
+import plotly.graph_objects as go
+import matplotlib
 
-# ==============================================================================
-# 1. CONFIGURACIÓN DE PÁGINA (Debe ser la primera llamada de Streamlit)
-# ==============================================================================
+# RULE 1: FIRST Streamlit call must be set_page_config
 st.set_page_config(
-    page_title="Analytics B2C | Histórico de Tráfico",
+    page_title="Dashboard Tráfico B2C",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ==============================================================================
-# 2. DATOS EN MEMORIA (Autonomía de datos garantizada)
-# ==============================================================================
-default_records = [
-    {"Fecha": "2026-01-21 00:00:00", "Visitantes": 31},
-    {"Fecha": "2026-01-20 00:00:00", "Visitantes": 28},
-    {"Fecha": "2026-01-19 00:00:00", "Visitantes": 26},
-    {"Fecha": "2026-01-18 00:00:00", "Visitantes": 25},
-    {"Fecha": "2026-01-17 00:00:00", "Visitantes": 27},
-    {"Fecha": "2026-01-16 00:00:00", "Visitantes": 18},
-    {"Fecha": "2026-01-15 00:00:00", "Visitantes": 22},
-    {"Fecha": "2026-01-14 00:00:00", "Visitantes": 15},
-    {"Fecha": "2026-01-13 00:00:00", "Visitantes": 15},
-    {"Fecha": "2026-01-12 00:00:00", "Visitantes": 8},
-    {"Fecha": "2026-01-11 00:00:00", "Visitantes": 9},
-    {"Fecha": "2026-01-10 00:00:00", "Visitantes": 15},
-    {"Fecha": "2026-01-09 00:00:00", "Visitantes": 16},
-    {"Fecha": "2026-01-08 00:00:00", "Visitantes": 12},
-    {"Fecha": "2026-01-07 00:00:00", "Visitantes": 16},
-    {"Fecha": "2026-01-06 00:00:00", "Visitantes": 14},
-    {"Fecha": "2026-01-05 00:00:00", "Visitantes": 24},
-    {"Fecha": "2026-01-04 00:00:00", "Visitantes": 15},
-    {"Fecha": "2026-01-03 00:00:00", "Visitantes": 8},
-    {"Fecha": "2026-01-02 00:00:00", "Visitantes": 15},
-    {"Fecha": "2026-01-01 00:00:00", "Visitantes": 14},
-    {"Fecha": "2025-12-31 00:00:00", "Visitantes": 10},
-    {"Fecha": "2025-12-30 00:00:00", "Visitantes": 35},
-    {"Fecha": "2025-12-29 00:00:00", "Visitantes": 13},
-    {"Fecha": "2025-12-28 00:00:00", "Visitantes": 13},
-    {"Fecha": "2025-12-27 00:00:00", "Visitantes": 26},
-    {"Fecha": "2025-12-26 00:00:00", "Visitantes": 26},
-    {"Fecha": "2025-12-25 00:00:00", "Visitantes": 12},
-    {"Fecha": "2025-12-24 00:00:00", "Visitantes": 14}
+# RULE 2: Embedded dataset
+EMBEDDED_RECORDS = [
+    {"fecha": "2026-01-21", "visitantes": 31},
+    {"fecha": "2026-01-20", "visitantes": 28},
+    {"fecha": "2026-01-19", "visitantes": 26},
+    {"fecha": "2026-01-18", "visitantes": 25},
+    {"fecha": "2026-01-17", "visitantes": 27},
+    {"fecha": "2026-01-16", "visitantes": 18},
+    {"fecha": "2026-01-15", "visitantes": 22},
+    {"fecha": "2026-01-14", "visitantes": 15},
+    {"fecha": "2026-01-13", "visitantes": 15},
+    {"fecha": "2026-01-12", "visitantes": 8},
+    {"fecha": "2026-01-11", "visitantes": 9},
+    {"fecha": "2026-01-10", "visitantes": 15},
+    {"fecha": "2026-01-09", "visitantes": 16},
+    {"fecha": "2026-01-08", "visitantes": 12},
+    {"fecha": "2026-01-07", "visitantes": 16},
+    {"fecha": "2026-01-06", "visitantes": 14},
+    {"fecha": "2026-01-05", "visitantes": 24},
+    {"fecha": "2026-01-04", "visitantes": 15},
+    {"fecha": "2026-01-03", "visitantes": 8},
+    {"fecha": "2026-01-02", "visitantes": 15},
+    {"fecha": "2026-01-01", "visitantes": 14},
+    {"fecha": "2025-12-31", "visitantes": 10},
+    {"fecha": "2025-12-30", "visitantes": 35},
+    {"fecha": "2025-12-29", "visitantes": 13},
+    {"fecha": "2025-12-28", "visitantes": 13},
+    {"fecha": "2025-12-27", "visitantes": 26},
+    {"fecha": "2025-12-26", "visitantes": 26},
+    {"fecha": "2025-12-25", "visitantes": 12},
+    {"fecha": "2025-12-24", "visitantes": 14}
 ]
 
-# ==============================================================================
-# 3. BARRA LATERAL: CARGA DE ARCHIVOS Y CONTROLES
-# ==============================================================================
-st.sidebar.header("🛠️ Configuración de Datos")
+# Helper function to load and clean raw data
+def prepare_dataframe(df_raw):
+    df = df_raw.copy()
+    # Defensive casting & cleaning (Rule 6)
+    if 'fecha' in df.columns:
+        df['fecha'] = pd.to_datetime(df['fecha'], errors='coerce')
+        df = df.dropna(subset=['fecha'])
+    if 'visitantes' in df.columns:
+        df['visitantes'] = pd.to_numeric(df['visitantes'], errors='coerce')
+        df = df.dropna(subset=['visitantes'])
+    
+    # Feature Engineering for business intelligence
+    if 'fecha' in df.columns:
+        dias_semana_es = {
+            0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 
+            4: 'Viernes', 5: 'Sábado', 6: 'Domingo'
+        }
+        df['dia_semana_num'] = df['fecha'].dt.dayofweek
+        df['dia_semana'] = df['dia_semana_num'].map(dias_semana_es)
+    return df
 
-# File Uploader Opcional
-uploaded_file = st.sidebar.file_uploader(
-    "Cargar Datos Nuevos (Opcional)", 
-    type=["csv", "xlsx"],
-    help="Sube un archivo con columnas 'Fecha' y 'Visitantes' para actualizar el dashboard de forma interactiva."
-)
+# RULE 3: Optional File Uploader in Sidebar
+st.sidebar.header("📥 Carga de Datos Adicionales")
+uploaded_file = st.sidebar.file_uploader("Sube un archivo de reemplazo (XLSX, CSV)", type=['xlsx', 'csv'])
 
-# Carga lógica de datos (Tipado defensivo y fallback)
 if uploaded_file is not None:
     try:
         if uploaded_file.name.endswith('.csv'):
-            df_raw = pd.read_csv(uploaded_file)
+            df_input = pd.read_csv(uploaded_file)
         else:
-            df_raw = pd.read_excel(uploaded_file)
+            df_input = pd.read_excel(uploaded_file)
         
-        # Validar la existencia de columnas requeridas
-        if 'Fecha' in df_raw.columns and 'Visitantes' in df_raw.columns:
-            df = df_raw.copy()
-            st.sidebar.success("¡Datos cargados con éxito!")
+        # Verify required columns exist (Rule 6)
+        if 'fecha' not in df_input.columns or 'visitantes' not in df_input.columns:
+            st.sidebar.error("El archivo debe contener las columnas 'fecha' y 'visitantes'")
+            df_active = prepare_dataframe(pd.DataFrame(EMBEDDED_RECORDS))
         else:
-            st.sidebar.error("El archivo debe contener las columnas 'Fecha' y 'Visitantes'. Usando datos por defecto.")
-            df = pd.DataFrame(default_records)
+            df_active = prepare_dataframe(df_input)
+            st.sidebar.success("Archivo cargado y procesado exitosamente.")
     except Exception as e:
-        st.sidebar.error(f"Error al leer el archivo: {e}. Usando datos predeterminados.")
-        df = pd.DataFrame(default_records)
+        st.sidebar.error(f"Error procesando el archivo: {e}")
+        df_active = prepare_dataframe(pd.DataFrame(EMBEDDED_RECORDS))
 else:
-    df = pd.DataFrame(default_records)
+    df_active = prepare_dataframe(pd.DataFrame(EMBEDDED_RECORDS))
 
-# Tipado defensivo e inicialización de columnas
-if 'Fecha' in df.columns:
-    df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
-    df = df.dropna(subset=['Fecha'])
-    df = df.sort_values('Fecha')
-else:
-    df['Fecha'] = pd.to_datetime([])
+# Ensure fallback in case df_active is completely empty after parsing
+if df_active.empty:
+    st.error("Error: El conjunto de datos activo está vacío. Cargando los datos en memoria por defecto.")
+    df_active = prepare_dataframe(pd.DataFrame(EMBEDDED_RECORDS))
 
-if 'Visitantes' in df.columns:
-    df['Visitantes'] = pd.to_numeric(df['Visitantes'], errors='coerce').fillna(0).astype(int)
-else:
-    df['Visitantes'] = 0
+# ==============================================================================
+# HEADER, METADATA & HISTORIC KPIs
+# ==============================================================================
+st.title("📈 Reporte de Tráfico de Visitantes B2C")
+st.subheader("Monitoreo de Flujo de Canales Digitales | Canal B2C (ST_B2C)")
 
-# Configuración de límites para los filtros
-if not df.empty:
-    min_date = df['Fecha'].min().date()
-    max_date = df['Fecha'].max().date()
-    min_vis = int(df['Visitantes'].min())
-    max_vis = int(df['Visitantes'].max())
-else:
-    min_date, max_date = pd.Timestamp('2025-12-24').date(), pd.Timestamp('2026-01-21').date()
-    min_vis, max_vis = 0, 100
-
-st.sidebar.markdown("---")
-st.sidebar.header("🎛️ Filtros de Control")
-
-# Selector de Rango de Fechas
-date_range = st.sidebar.date_input(
-    "Rango de Fechas",
-    value=(min_date, max_date),
-    min_value=min_date,
-    max_value=max_date,
-    help="Filtra el intervalo temporal del tráfico de visitantes."
+st.info(
+    "**Resumen Ejecutivo:** Monitoreo diario del flujo de visitantes del canal B2C "
+    "durante un período de 29 días, que abarca el cierre de diciembre de 2025 y las "
+    "primeras semanas de enero de 2026."
 )
 
-# Slider de Umbral de Visitantes
-visitor_range = st.sidebar.slider(
-    "Filtro de Umbral de Visitantes",
-    min_value=min_vis,
-    max_value=max_vis,
-    value=(min_vis, max_vis),
-    help="Muestra únicamente los registros de tráfico dentro de este rango numérico."
-)
+# Header Row: Metadata dates
+min_date_active = df_active['fecha'].min().date()
+max_date_active = df_active['fecha'].max().date()
 
-# Botón de Restablecimiento
-if st.sidebar.button("Limpiar Filtros", use_container_width=True):
-    st.rerun()
+meta_col1, meta_col2 = st.columns(2)
+with meta_col1:
+    st.write(f"📅 **Fecha de Inicio del Reporte:** `{min_date_active}`")
+with meta_col2:
+    st.write(f"📅 **Fecha de Fin del Reporte:** `{max_date_active}`")
 
-# ==============================================================================
-# 4. PROCESAMIENTO Y FILTRADO DE DATOS
-# ==============================================================================
-# Desempaquetar rango de fechas de forma segura
-if isinstance(date_range, tuple) and len(date_range) == 2:
-    start_date, end_date = date_range
-elif isinstance(date_range, tuple) and len(date_range) == 1:
-    start_date = date_range[0]
-    end_date = max_date
-else:
-    start_date, end_date = min_date, max_date
-
-# Aplicar filtros al DataFrame
-df_filtered = df[
-    (df['Fecha'].dt.date >= start_date) &
-    (df['Fecha'].dt.date <= end_date) &
-    (df['Visitantes'] >= visitor_range[0]) &
-    (df['Visitantes'] <= visitor_range[1])
-]
-
-# ==============================================================================
-# 5. ENCABEZADO Y METADATOS DEL DASHBOARD
-# ==============================================================================
-st.title("📈 Histórico de Tráfico de Visitantes B2C")
-
-with st.container():
-    st.info(
-        f"**Sujeto de Análisis:** Canal Digital B2C (`ST_B2C`)  \n"
-        f"**Periodo de Registro Activo:** Desde el `{start_date}` hasta el `{end_date}`.  \n"
-        f"**Contexto de Negocio:** Análisis y monitoreo estructurado del volumen de visitas diarias al portal B2C durante "
-        f"la temporada crítica de fin de año e inicio del nuevo año operativo.",
-        icon="ℹ️"
-    )
-
-# ==============================================================================
-# 6. SECCIÓN DE MÉTRICAS GLOBALES (KPIs)
-# ==============================================================================
-if not df_filtered.empty:
-    total_visitors = int(df_filtered['Visitantes'].sum())
-    avg_visitors = float(df_filtered['Visitantes'].mean())
-    max_visitors = int(df_filtered['Visitantes'].max())
-    min_visitors = int(df_filtered['Visitantes'].min())
-
-    # Fechas de ocurrencia para KPIs dinámicos
-    max_dates = df_filtered[df_filtered['Visitantes'] == max_visitors]['Fecha'].dt.strftime('%Y-%m-%d').tolist()
-    max_dates_str = ", ".join(max_dates[:2]) + ("..." if len(max_dates) > 2 else "")
-    
-    min_dates = df_filtered[df_filtered['Visitantes'] == min_visitors]['Fecha'].dt.strftime('%d-%b').tolist()
-    min_dates_str = ", ".join(min_dates[:2]) + ("..." if len(min_dates) > 2 else "")
-else:
-    total_visitors, avg_visitors, max_visitors, min_visitors = 0, 0.0, 0, 0
-    max_dates_str, min_dates_str = "N/A", "N/A"
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
+# Static / Historical summary from initial metadata
+st.markdown("### Métricas Históricas de Referencia")
+kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+with kpi_col1:
     st.metric(
-        label="Gran Total de Visitantes",
-        value=f"{total_visitors:,} 👥",
-        help="Suma totalizadora de visitantes únicos en el periodo filtrado."
+        label="👤 Total de Visitantes", 
+        value="522", 
+        help="Suma total acumulada de visitas en el período analizado de 29 días."
     )
-    st.caption("Visitas acumuladas")
-
-with col2:
+with kpi_col2:
     st.metric(
-        label="Promedio Diario",
-        value=f"{avg_visitors:.2f} 👥/día",
-        help="Media aritmética diaria de visitas al portal."
+        label="📊 Promedio Diario", 
+        value="18 visitantes/día", 
+        help="Media de tráfico diario registrado."
     )
-    st.caption("Rendimiento medio")
-
-with col3:
+with kpi_col3:
     st.metric(
-        label="Pico Máximo de Tráfico",
-        value=f"{max_visitors} 👥",
-        help=f"Nivel máximo alcanzado. Registrado en: {max_dates_str}"
+        label="🚀 Pico Máximo de Tráfico", 
+        value="35 visitantes", 
+        help="Registrado el día 2025-12-30."
     )
-    st.caption(f"Pico el: {max_dates_str}")
-
-with col4:
+with kpi_col4:
     st.metric(
-        label="Tráfico Mínimo",
-        value=f"{min_visitors} 👥",
-        help=f"Nivel mínimo de visitas captado. Registrado en: {min_dates_str}"
+        label="📉 Pico Mínimo de Tráfico", 
+        value="8 visitantes", 
+        help="Registrado los días 2026-01-03 y 2026-01-12."
     )
-    st.caption(f"Mínimo el: {min_dates_str}")
 
 st.markdown("---")
 
 # ==============================================================================
-# 7. ESTRUCTURA DE PESTAÑAS (TABS)
+# SIDEBAR FILTERS (Rule 6: Reactive & Dynamic)
 # ==============================================================================
-tab1, tab2 = st.tabs(["📊 Análisis Temporal (ST_B2C)", "🔍 Glosario y Relaciones Semánticas"])
+st.sidebar.header("🎛️ Filtros Interactivos")
+
+# 1. Date Range Filter
+date_range = st.sidebar.date_input(
+    "Selecciona Rango de Fechas:",
+    value=(min_date_active, max_date_active),
+    min_value=min_date_active,
+    max_value=max_date_active
+)
+
+# Parse reactive date inputs safely
+if isinstance(date_range, tuple) and len(date_range) == 2:
+    start_date, end_date = date_range
+else:
+    start_date, end_date = min_date_active, max_date_active
+
+# 2. Volume Range Filter (Slider)
+min_vis = int(df_active['visitantes'].min())
+max_vis = int(df_active['visitantes'].max())
+visitor_range = st.sidebar.slider(
+    "Filtrar por rango de visitantes diarios:",
+    min_value=min_vis,
+    max_value=max_vis,
+    value=(min_vis, max_vis)
+)
+
+# 3. Weekday Filter (Multiselect)
+if 'dia_semana' in df_active.columns:
+    unique_days = list(df_active['dia_semana'].unique())
+    selected_days = st.sidebar.multiselect(
+        "Filtrar por Día de la Semana:",
+        options=unique_days,
+        default=unique_days
+    )
+else:
+    selected_days = []
+
+# Apply reactive filters defensively
+df_filtered = df_active[
+    (df_active['fecha'].dt.date >= start_date) & 
+    (df_active['fecha'].dt.date <= end_date) &
+    (df_active['visitantes'] >= visitor_range[0]) &
+    (df_active['visitantes'] <= visitor_range[1])
+]
+
+if 'dia_semana' in df_filtered.columns and len(selected_days) > 0:
+    df_filtered = df_filtered[df_filtered['dia_semana'].isin(selected_days)]
+
+# RULE 6: Empty dataframe validation before plotting
+if df_filtered.empty:
+    st.warning("⚠️ No existen registros para la combinación de filtros seleccionada en la barra lateral.")
+    st.stop()
+
+# ==============================================================================
+# TABS AND VISUALIZATIONS
+# ==============================================================================
+tab1, tab2, tab3 = st.tabs([
+    "📈 Análisis de Tendencia", 
+    "📊 Comportamiento y Distribución", 
+    "📋 Datos Consolidados"
+])
 
 # ------------------------------------------------------------------------------
-# PESTAÑA 1: Análisis Temporal y Datos
+# TAB 1: Análisis de Tendencia
 # ------------------------------------------------------------------------------
 with tab1:
-    if df_filtered.empty:
-        st.warning("No se encontraron registros para los filtros seleccionados en la barra lateral.")
-    else:
-        # Layout de gráficos
-        g1, g2 = st.columns(2)
+    st.subheader("Evolución Temporal de Visitas")
+    
+    # Real-time reactive statistics
+    dr_col1, dr_col2, dr_col3 = st.columns(3)
+    with dr_col1:
+        st.metric("Total Visitantes (Rango)", int(df_filtered['visitantes'].sum()))
+    with dr_col2:
+        st.metric("Promedio Diario (Rango)", f"{df_filtered['visitantes'].mean():.1f}")
+    with dr_col3:
+        st.metric("Máximo Tráfico (Rango)", int(df_filtered['visitantes'].max()))
 
-        with g1:
-            # Gráfico de Línea - Evolución Temporal
-            fig_line = px.line(
-                df_filtered,
-                x='Fecha',
-                y='Visitantes',
-                title="Tendencia Diaria de Visitantes Portal B2C",
-                markers=True,
-                color_discrete_sequence=["#1f77b4"],
-                template="plotly_white"
-            )
-            fig_line.update_layout(hovermode="x unified")
-            
-            # Línea de referencia del promedio
-            fig_line.add_hline(
-                y=avg_visitors, 
-                line_dash="dash", 
-                line_color="#ff7f0e", 
-                annotation_text=f"Promedio Filtro: {avg_visitors:.1f}",
-                annotation_position="top right"
-            )
-            
-            # Regla de Oro: Leyendas Plotly seguras abajo
-            fig_line.update_layout(
-                legend=dict(orientation='h', yanchor='bottom', y=-0.25, xanchor='center', x=0.5)
-            )
-            
-            st.plotly_chart(fig_line, use_container_width=True)
-
-        with g2:
-            # Gráfico de Barra - Densidad e Intensidad
-            fig_bar = px.bar(
-                df_filtered,
-                x='Fecha',
-                y='Visitantes',
-                color='Visitantes',
-                title="Volumen e Intensidad de Tráfico por Fecha",
-                color_continuous_scale=px.colors.sequential.Viridis,
-                template="plotly_white"
-            )
-            
-            fig_bar.update_layout(
-                legend=dict(orientation='h', yanchor='bottom', y=-0.25, xanchor='center', x=0.5)
-            )
-            
-            st.plotly_chart(fig_bar, use_container_width=True)
-
-        st.markdown("---")
-        st.subheader("🔍 Explorador de Datos Históricos (ST_B2C)")
-
-        # Tabla Interactiva Formateada con Column Config
-        st.dataframe(
-            df_filtered,
-            use_container_width=True,
-            column_config={
-                "Fecha": st.column_config.DateColumn(
-                    "Fecha del Registro",
-                    format="YYYY-MM-DD",
-                    help="Fecha en formato ISO Año-Mes-Día"
-                ),
-                "Visitantes": st.column_config.NumberColumn(
-                    "Volumen de Visitantes",
-                    format="%d 👥",
-                    help="Cantidad de personas únicas registradas en el portal"
-                )
-            },
-            hide_index=True
+    # Line Chart of Trends
+    fig_line = px.line(
+        df_filtered.sort_values('fecha'),
+        x='fecha',
+        y='visitantes',
+        title='Tráfico de Visitantes a lo largo del tiempo',
+        labels={'fecha': 'Fecha', 'visitantes': 'Visitantes'},
+        markers=True,
+        template='plotly_white'
+    )
+    
+    # Add baseline average line
+    avg_val = df_filtered['visitantes'].mean()
+    fig_line.add_hline(
+        y=avg_val, 
+        line_dash="dash", 
+        line_color="red", 
+        annotation_text=f"Promedio: {avg_val:.1f}",
+        annotation_position="bottom right"
+    )
+    
+    # Add peak annotation if present in the current filter scope
+    peak_record = df_filtered[df_filtered['visitantes'] == df_filtered['visitantes'].max()]
+    if not peak_record.empty:
+        peak_row = peak_record.iloc[0]
+        fig_line.add_annotation(
+            x=peak_row['fecha'],
+            y=peak_row['visitantes'],
+            text=f"Máximo: {int(peak_row['visitantes'])}",
+            showarrow=True,
+            arrowhead=2,
+            ax=0,
+            ay=-40,
+            bgcolor="rgba(255, 235, 204, 0.9)",
+            bordercolor="orange"
         )
 
-        # Botón de exportabilidad en formato CSV para analistas
-        csv_data = df_filtered.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Descargar Datos Filtrados (CSV)",
-            data=csv_data,
-            file_name="historico_trafico_B2C_filtrado.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
+    # RULE 5: Rule-compliant horizontal legend positioning
+    fig_line.update_layout(
+        legend=dict(orientation='h', yanchor='bottom', y=-0.25, xanchor='center', x=0.5),
+        margin=dict(l=40, r=40, t=60, b=40)
+    )
+    st.plotly_chart(fig_line, width='stretch')
 
 # ------------------------------------------------------------------------------
-# PESTAÑA 2: Glosario y Relaciones Semánticas
+# TAB 2: Comportamiento y Distribución
 # ------------------------------------------------------------------------------
 with tab2:
-    st.header("🔍 Auditoría de Datos y Relaciones Semánticas")
-    st.markdown(
-        "Esta sección documenta el marco metodológico de agregación "
-        "y auditoría de coherencia de las métricas presentadas en este dashboard."
+    st.subheader("Análisis Estacional y Desglose de Tráfico")
+    
+    dist_col1, dist_col2 = st.columns(2)
+    
+    with dist_col1:
+        st.markdown("#### Distribución del Volumen Diario")
+        fig_bar_dist = px.bar(
+            df_filtered.sort_values('fecha'),
+            x='fecha',
+            y='visitantes',
+            color='visitantes',
+            color_continuous_scale='Blues',
+            labels={'fecha': 'Día', 'visitantes': 'Visitantes'},
+            title='Volumen Diario de Tráfico B2C'
+        )
+        fig_bar_dist.update_layout(
+            legend=dict(orientation='h', yanchor='bottom', y=-0.25, xanchor='center', x=0.5)
+        )
+        st.plotly_chart(fig_bar_dist, width='stretch')
+        
+    with dist_col2:
+        st.markdown("#### Análisis por Día de la Semana")
+        if 'dia_semana' in df_filtered.columns:
+            # Force chronological weekday order
+            orden_dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+            df_weekly = (
+                df_filtered.groupby(['dia_semana', 'dia_semana_num'])['visitantes']
+                .mean()
+                .reset_index()
+                .sort_values('dia_semana_num')
+            )
+            
+            fig_week = px.bar(
+                df_weekly,
+                x='dia_semana',
+                y='visitantes',
+                labels={'dia_semana': 'Día de la Semana', 'visitantes': 'Promedio de Visitantes'},
+                color='visitantes',
+                color_continuous_scale='Viridis',
+                title='Promedio de Visitantes por Día de la Semana'
+            )
+            fig_week.update_layout(
+                legend=dict(orientation='h', yanchor='bottom', y=-0.25, xanchor='center', x=0.5)
+            )
+            st.plotly_chart(fig_week, width='stretch')
+        else:
+            st.info("Columna 'dia_semana' no disponible para el desglose estacional.")
+
+# ------------------------------------------------------------------------------
+# TAB 3: Datos Consolidados
+# ------------------------------------------------------------------------------
+with tab3:
+    st.subheader("Explorador y Gobierno de Datos")
+    st.write("Tabla interactiva con el set de datos filtrado. Permite ordenación rápida y filtrado interno.")
+    
+    # RULE 4: Dataframe presentation with width stretch / container width and modern progress columns
+    st.dataframe(
+        df_filtered[['fecha', 'visitantes', 'dia_semana']].sort_values(by='fecha', ascending=False),
+        column_config={
+            "fecha": st.column_config.DateColumn(
+                "Fecha de Operación",
+                format="YYYY-MM-DD"
+            ),
+            "visitantes": st.column_config.ProgressColumn(
+                "Tráfico (Visitantes)",
+                help="Volumen diario de visitas registradas en la plataforma",
+                format="%d",
+                min_value=0,
+                max_value=int(df_active['visitantes'].max())
+            ),
+            "dia_semana": st.column_config.TextColumn(
+                "Día de la Semana"
+            )
+        },
+        width='stretch',
+        hide_index=True
     )
-
-    col_sem1, col_sem2 = st.columns(2)
-
-    with col_sem1:
-        st.subheader("🔗 Relaciones de Negocio Auditadas")
-        
-        with st.expander("📊 Relación de Agregación (Gran Total)", expanded=True):
-            st.markdown(
-                "**Fórmula:**  \n"
-                "$$\\sum_{i=1}^{n} \\text{Visitantes}_i = 512$$\n\n"
-                "* **Origen del Dato:** Columna `Visitantes` dentro del log de registros diarios.  \n"
-                "* **KPI Correspondiente:** `Gran Total de Visitantes` (512).  \n"
-                "* **Gobernanza:** Asegura la perfecta coherencia transaccional del acumulado total en los 29 días originales analizados."
-            )
-
-        with st.expander("📈 Relación Comparativa (Pico Máximo)", expanded=True):
-            st.markdown(
-                "**Mapeo:**  \n"
-                "$$\\max(\\text{Visitantes}) = 35 \\quad \\text{al día 2025-12-30}$$\n\n"
-                "* **Propósito:** El sistema analiza cronológicamente para detectar el comportamiento atípico más elevado (picos de campaña o estacionalidad festiva)."
-            )
-
-    with col_sem2:
-        st.subheader("📋 Glosario Técnico del Canal B2C")
-        
-        st.info(
-            "**ST_B2C:**  \n"
-            "Identificador del almacén de datos (Data Warehouse) correspondiente al flujo de visitantes B2C "
-            "(Business to Consumer) en portales web y aplicaciones móviles transaccionales.",
-            icon="🌐"
-        )
-        
-        st.info(
-            "**Periodo Vacacional Decembrino:**  \n"
-            "Se detecta una correlación estacional directa con caídas transaccionales a principios de "
-            "enero (mínimo de 8 visitantes los días 3 y 12 de enero) tras el pico festivo comercial de "
-            "fin de año (pico de 35 visitantes el 30 de diciembre de 2025).",
-            icon="📊"
-        )
+    
+    # Raw Data Export Button
+    csv_data = df_filtered[['fecha', 'visitantes']].to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Descargar datos filtrados (CSV)",
+        data=csv_data,
+        file_name="reporte_trafico_b2c.csv",
+        mime="text/csv",
+        width='stretch'
+    )
