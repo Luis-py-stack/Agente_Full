@@ -1,305 +1,386 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime
 import io
 
-# 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser la primera instrucción de Streamlit)
+# 1. CONFIGURACIÓN DE LA PÁGINA (Debe ser la primera llamada a Streamlit)
 st.set_page_config(
-    page_title="Control de Adquisiciones y Estructuras",
-    page_icon="🏗️",
+    page_title="Reporte de Tráfico Web - Canal ST_B2C",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 2. AUTONOMÍA DE DATOS (Datos por defecto basados en el JSON proporcionado)
-DEFAULT_METADATA = {
-    "document_title": "Control y Seguimiento de Adquisiciones y Diseños de Estructura",
-    "entity_or_subject": "Proyecto de Construcción e Infraestructura (Menciones a NIDEC y TECOIMSA)",
-    "date": "2026-07-07",
-    "general_summary": "Monitoreo de tareas críticas, órdenes de compra (OC) y entregables de diseño estructural, detallando responsables, estatus de avance y siguientes acciones inmediatas."
+# 2. DATOS DE RESPALDO EN MEMORIA (AUTONOMÍA DE DATOS)
+DATA_JSON = {
+  "metadata": {
+    "document_title": "Reporte de Tráfico Web - Canal ST_B2C",
+    "entity_or_subject": "ST_B2C (Canal de Comercio Electrónico B2C)",
+    "dates": "2025-12-24 a 2026-01-21",
+    "general_summary": "Monitoreo y registro del volumen diario de visitantes para el canal de negocio B2C, abarcando la temporada de fin de año 2025 y el inicio del año 2026."
+  },
+  "global_kpis_and_totals": {
+    "total_visitantes": 522,
+    "promedio_diario": 18.0,
+    "pico_maximo": 35,
+    "pico_fecha": "2025-12-30",
+    "minimo_registrado": 8
+  },
+  "records": [
+    { "Fecha": "2026-01-21 00:00:00", "Visitantes": 31 },
+    { "Fecha": "2026-01-20 00:00:00", "Visitantes": 28 },
+    { "Fecha": "2026-01-19 00:00:00", "Visitantes": 26 },
+    { "Fecha": "2026-01-18 00:00:00", "Visitantes": 25 },
+    { "Fecha": "2026-01-17 00:00:00", "Visitantes": 27 },
+    { "Fecha": "2026-01-16 00:00:00", "Visitantes": 18 },
+    { "Fecha": "2026-01-15 00:00:00", "Visitantes": 22 },
+    { "Fecha": "2026-01-14 00:00:00", "Visitantes": 15 },
+    { "Fecha": "2026-01-13 00:00:00", "Visitantes": 15 },
+    { "Fecha": "2026-01-12 00:00:00", "Visitantes": 8 },
+    { "Fecha": "2026-01-11 00:00:00", "Visitantes": 9 },
+    { "Fecha": "2026-01-10 00:00:00", "Visitantes": 15 },
+    { "Fecha": "2026-01-09 00:00:00", "Visitantes": 16 },
+    { "Fecha": "2026-01-08 00:00:00", "Visitantes": 12 },
+    { "Fecha": "2026-01-07 00:00:00", "Visitantes": 16 },
+    { "Fecha": "2026-01-06 00:00:00", "Visitantes": 14 },
+    { "Fecha": "2026-01-05 00:00:00", "Visitantes": 24 },
+    { "Fecha": "2026-01-04 00:00:00", "Visitantes": 15 },
+    { "Fecha": "2026-01-03 00:00:00", "Visitantes": 8 },
+    { "Fecha": "2026-01-02 00:00:00", "Visitantes": 15 },
+    { "Fecha": "2026-01-01 00:00:00", "Visitantes": 14 },
+    { "Fecha": "2025-12-31 00:00:00", "Visitantes": 10 },
+    { "Fecha": "2025-12-30 00:00:00", "Visitantes": 35 },
+    { "Fecha": "2025-12-29 00:00:00", "Visitantes": 13 },
+    { "Fecha": "2025-12-28 00:00:00", "Visitantes": 13 },
+    { "Fecha": "2025-12-27 00:00:00", "Visitantes": 26 },
+    { "Fecha": "2025-12-26 00:00:00", "Visitantes": 26 },
+    { "Fecha": "2025-12-25 00:00:00", "Visitantes": 12 },
+    { "Fecha": "2025-12-24 00:00:00", "Visitantes": 14 }
+  ]
 }
 
+# Inicializar cargando los datos base
 @st.cache_data
 def get_default_data():
-    records = [
-        {
-            "ID": 1,
-            "Fecha captura": "2026-07-07 00:00:00",
-            "Concepto": "OC cimentaciones",
-            "Departamento": "Compras",
-            "Responsable": None,
-            "Estatus": "Cerrado",
-            "Siguiente paso": "ya se tiene cotizacion con Rangel, se comparte el dia de hoy para revision"
-        },
-        {
-            "ID": 2,
-            "Fecha captura": "2026-07-07 00:00:00",
-            "Concepto": "OC estructura",
-            "Departamento": "Compras",
-            "Responsable": "Judith Echeverria",
-            "Estatus": "Critico",
-            "Siguiente paso": "Se comparte OC el dia de hoy, anticipo se paga en 15 dias, en confirmacion de reunion el dia de hoy  (TECOIMSA)"
-        },
-        {
-            "ID": 3,
-            "Fecha captura": "2026-07-07 00:00:00",
-            "Concepto": "Entrega diseño de estructura",
-            "Departamento": "Diseño",
-            "Responsable": "Carlos Mendez",
-            "Estatus": "En proceso",
-            "Siguiente paso": "En proceso de revision y vobo de NIDEC"
-        },
-        {
-            "ID": 4,
-            "Fecha captura": "2026-07-07 00:00:00",
-            "Concepto": "OC de anclas y placas",
-            "Departamento": "Compras",
-            "Responsable": "Judith Echeverria",
-            "Estatus": "En proceso",
-            "Siguiente paso": "Ya se comenzo cotizacion de materiales para entrega a Luis Ramirez. (tiempo de fabricacion 4 dias)"
-        },
-        {
-            "ID": 5,
-            "Fecha captura": "2026-07-07 00:00:00",
-            "Concepto": "Memoria calculo estructural (estructura metalica)",
-            "Departamento": "Diseño",
-            "Responsable": None,
-            "Estatus": "Cerrado",
-            "Siguiente paso": "Se espera entrega el proximo miercoles 15"
-        }
-    ]
-    df = pd.DataFrame(records)
-    df["Fecha captura"] = pd.to_datetime(df["Fecha captura"])
-    # Limpieza inicial de nulos en responsable para evitar fallos de visualización
-    df["Responsable"] = df["Responsable"].fillna("No Asignado ⚠️")
+    df = pd.DataFrame(DATA_JSON["records"])
+    df["Fecha"] = pd.to_datetime(df["Fecha"])
+    df["Visitantes"] = pd.to_numeric(df["Visitantes"])
     return df
 
-# 3. FILE UPLOADER OPCIONAL EN SIDEBAR
-st.sidebar.header("📂 Carga de Datos Externos")
-uploaded_file = st.sidebar.file_uploader(
-    "Cargue un archivo de control nuevo (Formatos aceptados: .xlsx, .csv)",
-    type=["xlsx", "csv"]
-)
+df_base = get_default_data()
 
-# Determinación de fuente de datos activa
+# Días de la semana en español para análisis y Feature Engineering
+DIAS_MAP = {
+    'Monday': 'Lunes', 'Tuesday': 'Martes', 'Wednesday': 'Miércoles',
+    'Thursday': 'Jueves', 'Friday': 'Viernes', 'Saturday': 'Sábado', 'Sunday': 'Domingo'
+}
+
+# 3. BARRA LATERAL (FILTROS INTERACTIVOS Y CARGA DE ARCHIVO)
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3121/3121768.png", width=70)
+st.sidebar.title("Configuración y Filtros")
+
+# File Uploader opcional
+uploaded_file = st.sidebar.file_uploader("Subir archivo de tráfico nuevo (Opcional)", type=["xlsx", "csv"])
+
 if uploaded_file is not None:
     try:
         if uploaded_file.name.endswith(".csv"):
-            df_active = pd.read_csv(uploaded_file)
+            df_input = pd.read_csv(uploaded_file)
         else:
-            df_active = pd.read_excel(uploaded_file)
+            df_input = pd.read_excel(uploaded_file)
         
-        # Validaciones de consistencia mínima
-        if "Fecha captura" in df_active.columns:
-            df_active["Fecha captura"] = pd.to_datetime(df_active["Fecha captura"], errors="coerce")
-        if "Responsable" in df_active.columns:
-            df_active["Responsable"] = df_active["Responsable"].fillna("No Asignado ⚠️")
-        
-        st.sidebar.success("¡Archivo cargado con éxito!")
+        # Validar estructura básica necesaria
+        if "Fecha" in df_input.columns and "Visitantes" in df_input.columns:
+            df_input["Fecha"] = pd.to_datetime(df_input["Fecha"])
+            df_input["Visitantes"] = pd.to_numeric(df_input["Visitantes"])
+            df_working = df_input.copy()
+            st.sidebar.success("¡Archivo cargado correctamente!")
+        else:
+            st.sidebar.error("El archivo debe contener las columnas 'Fecha' y 'Visitantes'. Usando datos por defecto.")
+            df_working = df_base.copy()
     except Exception as e:
-        st.sidebar.error(f"Error procesando archivo: {e}. Usando datos predeterminados.")
-        df_active = get_default_data()
+        st.sidebar.error(f"Error al procesar el archivo: {e}. Usando datos por defecto.")
+        df_working = df_base.copy()
 else:
-    df_active = get_default_data()
+    df_working = df_base.copy()
 
-# 4. BARRA LATERAL (FILTROS DINÁMICOS REACTIVOS)
-st.sidebar.markdown("---")
-st.sidebar.header("🎯 Filtros del Tablero")
+# Feature Engineering
+if "Fecha" in df_working.columns:
+    df_working["Día_Semana"] = df_working["Fecha"].dt.day_name().map(DIAS_MAP)
 
-# Validación y creación de filtros dinámicos basados en la disponibilidad de columnas
-filtered_df = df_active.copy()
+# --- Controles de Filtrado ---
+st.sidebar.subheader("Filtros del Dashboard")
 
-# Filtro por Departamento
-if "Departamento" in df_active.columns:
-    dept_options = df_active["Departamento"].dropna().unique().tolist()
-    selected_depts = st.sidebar.multiselect("Filtrar por Departamento:", dept_options, default=dept_options)
-    filtered_df = filtered_df[filtered_df["Departamento"].isin(selected_depts)]
-
-# Filtro por Estatus
-if "Estatus" in df_active.columns:
-    estatus_options = df_active["Estatus"].dropna().unique().tolist()
-    selected_estatus = st.sidebar.multiselect("Filtrar por Estatus de Tarea:", estatus_options, default=estatus_options)
-    filtered_df = filtered_df[filtered_df["Estatus"].isin(selected_estatus)]
-
-# Filtro por Responsable
-if "Responsable" in df_active.columns:
-    resp_options = df_active["Responsable"].unique().tolist()
-    selected_resp = st.sidebar.multiselect("Filtrar por Responsable Asignado:", resp_options, default=resp_options)
-    filtered_df = filtered_df[filtered_df["Responsable"].isin(selected_resp)]
-
-# Filtro de escala temporal de manera informativa y adaptada
-if "Fecha captura" in df_active.columns:
-    min_date = df_active["Fecha captura"].min()
-    max_date = df_active["Fecha captura"].max()
-    if pd.notnull(min_date) and pd.notnull(max_date):
-        st.sidebar.date_input(
-            "Rango de Fechas (Solo Lectura / Contexto Histórico)",
-            value=(min_date.date(), max_date.date()),
-            min_value=min_date.date(),
-            max_value=max_date.date(),
-            disabled=True
-        )
-
-# 5. SECCIÓN SUPERIOR: ENCABEZADO Y METADATOS
-st.title("🏗️ " + DEFAULT_METADATA["document_title"])
-st.markdown(f"**Sujeto de Análisis:** {DEFAULT_METADATA['entity_or_subject']}")
-
-with st.expander("ℹ️ Resumen Ejecutivo y Metadatos de Captura", expanded=True):
-    col_meta1, col_meta2 = st.columns([1, 3])
-    with col_meta1:
-        st.metric("Fecha de Captura Global", DEFAULT_METADATA["date"])
-    with col_meta2:
-        st.markdown(f"**Propósito del Reporte:** {DEFAULT_METADATA['general_summary']}")
-
-# 6. KPI METRICS DINÁMICAS (Calculadas sobre el DataFrame Filtrado)
-st.markdown("---")
-st.subheader("📈 Indicadores Operativos en Tiempo Real")
-
-# Cálculos dinámicos basados en la estructura disponible
-total_tasks = len(filtered_df)
-critical_tasks = len(filtered_df[filtered_df["Estatus"] == "Critico"]) if "Estatus" in filtered_df.columns else 0
-process_tasks = len(filtered_df[filtered_df["Estatus"] == "En proceso"]) if "Estatus" in filtered_df.columns else 0
-closed_tasks = len(filtered_df[filtered_df["Estatus"] == "Cerrado"]) if "Estatus" in filtered_df.columns else 0
-
-kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
-
-with kpi_col1:
-    st.metric(label="Total de Tareas Registradas", value=total_tasks, help="Suma de todas las tareas activas y cerradas")
-with kpi_col2:
-    st.metric(
-        label="🔴 Tareas en Estatus Crítico", 
-        value=critical_tasks, 
-        delta="Acción Prioritaria" if critical_tasks > 0 else None,
-        delta_color="inverse"
+# Rango de fechas
+if "Fecha" in df_working.columns:
+    min_date = df_working["Fecha"].min().date()
+    max_date = df_working["Fecha"].max().date()
+    
+    date_range = st.sidebar.date_input(
+        "Rango Temporal",
+        value=[min_date, max_date],
+        min_value=min_date,
+        max_value=max_date
     )
-with kpi_col3:
-    st.metric(label="🟡 Tareas en Proceso", value=process_tasks)
-with kpi_col4:
-    st.metric(label="🟢 Tareas Cerradas", value=closed_tasks)
+else:
+    date_range = None
+
+# Umbral de volumen de visitantes
+if "Visitantes" in df_working.columns:
+    min_vis = int(df_working["Visitantes"].min())
+    max_vis = int(df_working["Visitantes"].max())
+    
+    visitor_threshold = st.sidebar.slider(
+        "Umbral de Visitantes Diarios",
+        min_value=min_vis,
+        max_value=max_vis,
+        value=(min_vis, max_vis)
+    )
+else:
+    visitor_threshold = None
+
+# Filtro por Día de la semana
+if "Día_Semana" in df_working.columns:
+    days_list = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+    selected_days = st.sidebar.multiselect(
+        "Días de la semana",
+        options=days_list,
+        default=days_list
+    )
+else:
+    selected_days = []
+
+# --- Aplicar Filtros Reactivos ---
+df_filtered = df_working.copy()
+
+if "Fecha" in df_filtered.columns and date_range and len(date_range) == 2:
+    df_filtered = df_filtered[
+        (df_filtered["Fecha"].dt.date >= date_range[0]) & 
+        (df_filtered["Fecha"].dt.date <= date_range[1])
+    ]
+
+if "Visitantes" in df_filtered.columns and visitor_threshold:
+    df_filtered = df_filtered[
+        (df_filtered["Visitantes"] >= visitor_threshold[0]) & 
+        (df_filtered["Visitantes"] <= visitor_threshold[1])
+    ]
+
+if "Día_Semana" in df_filtered.columns and selected_days:
+    df_filtered = df_filtered[df_filtered["Día_Semana"].isin(selected_days)]
+
+# 4. DISEÑO DE INTERFAZ PRINCIPAL
+# Encabezado de Metadatos
+st.title("📊 Reporte de Tráfico Web - Canal ST_B2C")
+
+with st.container():
+    col_meta1, col_meta2 = st.columns([3, 1])
+    with col_meta1:
+        st.markdown(f"**Sujeto bajo análisis:** `{DATA_JSON['metadata']['entity_or_subject']}`")
+        st.markdown(f"*{DATA_JSON['metadata']['general_summary']}*")
+    with col_meta2:
+        st.info(f"📅 **Periodo Base:** {DATA_JSON['metadata']['dates']}")
 
 st.markdown("---")
 
-# 7. ORGANIZACIÓN EN PESTAÑAS (TABS)
-tab_dashboard, tab_datos, tab_relaciones = st.tabs([
-    "📊 Tablero de Control Visual", 
-    "📋 Auditoría de Registros", 
-    "🧠 Dependencias Técnicas y Alertas"
+# 5. TARJETAS DE KPIS GLOBALES (DINÁMICOS VS LÍNEA BASE)
+if "Visitantes" in df_filtered.columns and not df_filtered.empty:
+    current_total = int(df_filtered["Visitantes"].sum())
+    current_mean = round(df_filtered["Visitantes"].mean(), 1)
+    current_max = int(df_filtered["Visitantes"].max())
+    current_min = int(df_filtered["Visitantes"].min())
+    
+    # Calcular delta relativo al baseline histórico para valor añadido
+    delta_total = current_total - DATA_JSON["global_kpis_and_totals"]["total_visitantes"]
+    delta_mean = round(current_mean - DATA_JSON["global_kpis_and_totals"]["promedio_diario"], 1)
+else:
+    current_total, current_mean, current_max, current_min = 0, 0, 0, 0
+    delta_total, delta_mean = 0, 0
+
+col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+
+with col_kpi1:
+    st.metric(
+        label="Total de Visitantes",
+        value=f"{current_total} visitantes",
+        delta=f"{delta_total:+} vs base" if uploaded_file is None else None,
+        help="Suma acumulada de visitas dentro del rango y filtros aplicados."
+    )
+
+with col_kpi2:
+    st.metric(
+        label="Promedio Diario",
+        value=f"{current_mean} visitas/día",
+        delta=f"{delta_mean:+} vs base" if uploaded_file is None else None,
+        help="Media de tráfico diario registrado en el sitio bajo el filtro actual."
+    )
+
+with col_kpi3:
+    st.metric(
+        label="Pico Máximo de Tráfico",
+        value=f"{current_max} visitantes",
+        help="Mayor volumen de tráfico diario registrado según filtros actuales."
+    )
+
+with col_kpi4:
+    st.metric(
+        label="Tráfico Mínimo Registrado",
+        value=f"{current_min} visitantes",
+        help="Menor volumen de tráfico diario registrado según filtros actuales."
+    )
+
+st.markdown("---")
+
+# 6. ORGANIZACIÓN POR PESTAÑAS (TABS)
+tab_visualizacion, tab_datos_origen = st.tabs([
+    "📈 Análisis de Tráfico y Tendencias", 
+    "🗃️ Tabla de Datos: st_b2c_daily_visitors"
 ])
 
-# 📌 PESTAÑA 1: TABLERO VISUAL (Gráficos Plotly)
-with tab_dashboard:
-    if filtered_df.empty:
-        st.warning("⚠️ No existen registros para la combinación de filtros seleccionada en la barra lateral.")
+# --- PESTAÑA 1: VISUALIZACIONES ---
+with tab_visualizacion:
+    if df_filtered.empty:
+        st.warning("No hay datos disponibles para los filtros seleccionados. Intente ajustar el rango en la barra lateral.")
     else:
-        g_col1, g_col2 = st.columns(2)
+        st.subheader("Análisis Visual del Comportamiento Temporal")
         
-        with g_col1:
-            if "Estatus" in filtered_df.columns:
-                fig_pie = px.pie(
-                    filtered_df,
-                    names="Estatus",
-                    hole=0.4,
-                    color="Estatus",
-                    color_discrete_map={
-                        "Critico": "#EF553B",    # Rojo
-                        "En proceso": "#636EFA", # Azul
-                        "Cerrado": "#00CC96"     # Verde
-                    },
-                    title="<b>Distribución de Tareas por Estatus de Urgencia</b>"
-                )
-                fig_pie.update_layout(margin=dict(l=20, r=20, t=50, b=20))
-                st.plotly_chart(fig_pie, use_container_width=True)
-            else:
-                st.info("La columna 'Estatus' no se encuentra disponible para graficar.")
-                
-        with g_col2:
-            if "Responsable" in filtered_df.columns and "Estatus" in filtered_df.columns:
-                # Contabilizar ocurrencias para la barra
-                df_counts = filtered_df.groupby(["Responsable", "Estatus"]).size().reset_index(name="Tareas")
-                
-                fig_bar = px.bar(
-                    df_counts,
-                    x="Responsable",
-                    y="Tareas",
-                    color="Estatus",
-                    color_discrete_map={
-                        "Critico": "#EF553B",
-                        "En proceso": "#636EFA",
-                        "Cerrado": "#00CC96"
-                    },
-                    title="<b>Distribución de Carga y Estatus por Responsable Asignado</b>",
-                    labels={"Tareas": "Cantidad de Tareas", "Responsable": "Responsable Técnico"}
-                )
-                fig_bar.update_layout(yaxis_title="Cantidad de Actividades", margin=dict(l=20, r=20, t=50, b=20))
-                st.plotly_chart(fig_bar, use_container_width=True)
-            else:
-                st.info("Las columnas necesarias ('Responsable', 'Estatus') no se encuentran disponibles.")
-
-# 📌 PESTAÑA 2: AUDITORÍA DE REGISTROS (Datatable Interactiva y Descargas)
-with tab_datos:
-    st.subheader("Buscador y Visualizador del Repositorio de Datos")
-    st.markdown("La siguiente tabla representa el conjunto consolidado con los filtros dinámicos activos.")
-    
-    # Configuración de columnas para un despliegue optimizado de UX
-    column_configuration = {
-        "ID": st.column_config.NumberColumn("ID Interno", format="%d"),
-        "Fecha captura": st.column_config.DateColumn("Fecha Captura", format="YYYY-MM-DD"),
-        "Concepto": st.column_config.TextColumn("Hito / Tarea de Adquisición"),
-        "Departamento": st.column_config.TextColumn("Área Encargada"),
-        "Responsable": st.column_config.TextColumn("Responsable Técnico"),
-        "Estatus": st.column_config.TextColumn("Estatus Actual"),
-        "Siguiente paso": st.column_config.TextColumn("Siguiente Acción Inmediata")
-    }
-    
-    # Filtrar solo columnas presentes en la tabla activa para evitar excepciones de configuración
-    active_cols_config = {k: v for k, v in column_configuration.items() if k in filtered_df.columns}
-    
-    st.dataframe(
-        filtered_df,
-        use_container_width=True,
-        column_config=active_cols_config,
-        hide_index=True
-    )
-    
-    # Descarga interactiva de datos filtrados
-    csv_buffer = io.StringIO()
-    filtered_df.to_csv(csv_buffer, index=False)
-    csv_data = csv_buffer.getvalue()
-    
-    st.download_button(
-        label="📥 Exportar Reporte Filtrado como CSV",
-        data=csv_data,
-        file_name="Control_Adquisiciones_Filtrado.csv",
-        mime="text/csv"
-    )
-
-# 📌 PESTAÑA 3: DEPENDENCIAS TÉCNICAS Y ALERTAS (Semántica e inteligencia de negocio)
-with tab_relaciones:
-    st.subheader("🧠 Matriz de Relaciones Semánticas y Cuellos de Botella Técnicos")
-    
-    # Caja informativa estructurada con Markdown
-    st.info(
-        "💡 **Agregación Lógica del Sistema:** El total consolidado de indicadores mostrados corresponde "
-        "a la suma lineal de las dependencias logísticas y operativas del proyecto. El progreso de ingeniería de diseño "
-        "condiciona de manera directa la colocación y validación de órdenes de compra (OC) de suministros."
-    )
-    
-    col_rel_left, col_rel_right = st.columns(2)
-    
-    with col_rel_left:
-        st.error(
-            "### 🔴 Alerta de Ruta Crítica (Estructuras - TECOIMSA)\n\n"
-            "La tarea **OC Estructura** (ID 2), bajo la responsabilidad directa de **Judith Echeverria**, "
-            "representa el hito con mayor riesgo para el cronograma del proyecto.\n\n"
-            "**Detalle Operativo:** Se requiere la liberación del anticipo en los próximos 15 días y la "
-            "consolidación de la reunión técnica con el proveedor **TECOIMSA** de manera urgente."
-        )
+        # Fila para Gráfico A (Evolución) y Gráfico B (Distribución)
+        col_chart1, col_chart2 = st.columns([2, 1])
         
-    with col_rel_right:
-        st.warning(
-            "### 🔄 Cuello de Botella Técnico (NIDEC ➡️ TECOIMSA)\n\n"
-            "Existe una dependencia cruzada de alta prioridad entre la tarea de **Entrega diseño de estructura** (ID 3) "
-            "y la **OC estructura** (ID 2).\n\n"
-            "**Justificación:** No es viable iniciar el proceso formal de fabricación de acero estructural con "
-            "TECOIMSA sin obtener previamente la aprobación técnica de ingeniería y el visto bueno final por parte de **NIDEC**."
-        )
+        with col_chart1:
+            if "Fecha" in df_filtered.columns and "Visitantes" in df_filtered.columns:
+                # Asegurar orden cronológico para gráfico lineal
+                df_chart_a = df_filtered.sort_values(by="Fecha")
+                
+                fig_line = px.area(
+                    df_chart_a, 
+                    x="Fecha", 
+                    y="Visitantes",
+                    title="Evolución Diaria del Tráfico de Visitantes (Canal B2C)",
+                    labels={"Fecha": "Fecha de Análisis", "Visitantes": "Cantidad de Visitantes"},
+                    template="plotly_white",
+                    color_discrete_sequence=["#1f77b4"]
+                )
+                
+                # Línea de referencia del Promedio Global Histórico (18.0)
+                fig_line.add_hline(
+                    y=18.0, 
+                    line_dash="dash", 
+                    line_color="red", 
+                    annotation_text="Media Histórica (18.0)",
+                    annotation_position="bottom left"
+                )
+                
+                # Anotación del Pico Máximo Histórico si está dentro de los filtros
+                if not df_chart_a[df_chart_a["Fecha"] == "2025-12-30"].empty:
+                    fig_line.add_annotation(
+                        x="2025-12-30",
+                        y=35,
+                        text="Pico Histórico (35)",
+                        showarrow=True,
+                        arrowhead=2,
+                        ax=40,
+                        ay=-40,
+                        bgcolor="rgba(255, 255, 255, 0.8)",
+                        bordercolor="#1f77b4"
+                    )
+                
+                fig_line.update_layout(
+                    hovermode="x unified",
+                    xaxis_title="",
+                    yaxis_title="Visitantes",
+                    margin=dict(l=40, r=40, t=50, b=40)
+                )
+                
+                st.plotly_chart(fig_line, use_container_width=True)
+        
+        with col_chart2:
+            if "Visitantes" in df_filtered.columns:
+                fig_box = px.box(
+                    df_filtered,
+                    y="Visitantes",
+                    points="all",
+                    title="Distribución y Rango del Tráfico",
+                    labels={"Visitantes": "Tráfico (Visitantes)"},
+                    template="plotly_white",
+                    color_discrete_sequence=["#2ca02c"]
+                )
+                fig_box.update_layout(
+                    margin=dict(l=40, r=40, t=50, b=40)
+                )
+                st.plotly_chart(fig_box, use_container_width=True)
+
+        # Fila adicional para desglose de estacionalidad
+        st.subheader("Análisis de Estacionalidad Semanal")
+        if "Día_Semana" in df_filtered.columns and "Visitantes" in df_filtered.columns:
+            # Calcular promedio por día de la semana para detectar patrones de consumo
+            order_days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+            df_day_agg = df_filtered.groupby("Día_Semana")["Visitantes"].mean().reindex(order_days).reset_index()
+            df_day_agg = df_day_agg.dropna()
+            
+            fig_bar = px.bar(
+                df_day_agg,
+                x="Día_Semana",
+                y="Visitantes",
+                title="Tráfico Promedio por Día de la Semana",
+                labels={"Día_Semana": "Día de la Semana", "Visitantes": "Visitas Promedio"},
+                template="plotly_white",
+                color="Visitantes",
+                color_continuous_scale="Viridis"
+            )
+            fig_bar.update_layout(
+                xaxis_title="",
+                yaxis_title="Promedio de Visitantes"
+            )
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+# --- PESTAÑA 2: TABLA DE DATOS ---
+with tab_datos_origen:
+    st.subheader("Auditoría y Exportación de Registros")
+    st.markdown("A continuación se muestra la tabla interactiva basada en los filtros activos en la barra lateral.")
+    
+    if df_filtered.empty:
+        st.warning("No hay registros para mostrar.")
+    else:
+        # Preparación de la visualización
+        df_display = df_filtered.copy()
+        if "Fecha" in df_display.columns:
+            # Limpiar la estampa de tiempo
+            df_display["Fecha_Formateada"] = df_display["Fecha"].dt.strftime("%Y-%m-%d")
+        
+        # Botón para descargar los datos filtrados en CSV
+        @st.cache_data
+        def convert_df_to_csv(df):
+            return df.to_csv(index=False).encode('utf-8')
+        
+        csv_data = convert_df_to_csv(df_display)
+        
+        col_actions1, col_actions2 = st.columns([6, 1])
+        with col_actions2:
+            st.download_button(
+                label="📥 Descargar CSV",
+                data=csv_data,
+                file_name="trafico_b2c_filtrado.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        # Renderizado del dataframe con estilo y formato condicional
+        # Eliminamos temporalmente la columna original datetime para mejorar legibilidad
+        cols_to_show = ["Fecha_Formateada", "Visitantes", "Día_Semana"]
+        cols_to_show = [c for c in cols_to_show if c in df_display.columns]
+        
+        df_show = df_display[cols_to_show].rename(columns={"Fecha_Formateada": "Fecha de Registro"})
+        
+        if "Visitantes" in df_show.columns:
+            st.dataframe(
+                df_show.style.background_gradient(subset=["Visitantes"], cmap="YlGnBu"),
+                use_container_width=True,
+                column_config={
+                    "Fecha de Registro": st.column_config.DateColumn("Fecha de Registro"),
+                    "Visitantes": st.column_config.NumberColumn("Total de Visitantes", format="%d"),
+                    "Día_Semana": st.column_config.TextColumn("Día de la Semana")
+                }
+            )
+        else:
+            st.dataframe(df_show, use_container_width=True)
